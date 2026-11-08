@@ -470,7 +470,7 @@ const LEVELS = [
 ];
 
 /* ---------------------------- ESTADO GLOBAL ---------------------------- */
-const MP = {peer:null, conn:null, remote:null, code:'', isHost:false, lastSend:0};
+const MP = {peer:null, conn:null, remote:null, code:'', isHost:false, lastSend:0, connectTimer:null};
 let peerLoadPromise = null;
 function ensurePeerJS(){
   if(window.Peer) return Promise.resolve(true);
@@ -1376,7 +1376,12 @@ function mpSend(packet){
 }
 function mpAttach(conn){
   MP.conn=conn;
+  if(MP.connectTimer){clearTimeout(MP.connectTimer);MP.connectTimer=null;}
+  MP.connectTimer=setTimeout(()=>{
+    if(!conn.open){mpStatus('No se pudo enlazar. Revisen el código y prueben otra red o vuelvan a crear la sala.');}
+  },25000);
   conn.on('open',()=>{
+    if(MP.connectTimer){clearTimeout(MP.connectTimer);MP.connectTimer=null;}
     S.multiplayer=true;
     mpStatus(MP.isHost?'🟢 Conectado. Eres el anfitrión: tú inicias la partida.':'🟢 Conectado. Espera a que el anfitrión inicie la partida.');
     $('chatPanel').style.display='block';
@@ -1410,8 +1415,8 @@ function mpAttach(conn){
       mpAddMessage(String(data.name||'Jugador').slice(0,20),String(data.text||'').slice(0,120));
     }
   });
-  conn.on('close',()=>{MP.conn=null;MP.remote=null;S.multiplayer=false;$('chatPanel').style.display='none';mpStatus('El otro jugador se desconectó.');});
-  conn.on('error',()=>mpStatus('Error de conexión. Comprueben el código e inténtenlo otra vez.'));
+  conn.on('close',()=>{if(MP.connectTimer){clearTimeout(MP.connectTimer);MP.connectTimer=null;}MP.conn=null;MP.remote=null;S.multiplayer=false;$('chatPanel').style.display='none';mpStatus('El otro jugador se desconectó.');});
+  conn.on('error',()=>{if(MP.connectTimer){clearTimeout(MP.connectTimer);MP.connectTimer=null;}mpStatus('Error de conexión. Comprueben el código e inténtenlo otra vez.');});
 }
 async function mpCreateRoom(){
   mpStatus('Cargando conexión multijugador...');
@@ -1420,7 +1425,7 @@ async function mpCreateRoom(){
   const code=mpCode(); MP.code=code; MP.isHost=true;
   mpStatus('Creando sala...');
   try{
-    MP.peer=new Peer(code,{host:'0.peerjs.com',port:443,path:'/',secure:true,debug:1});
+    MP.peer=new Peer(code,{host:'0.peerjs.com',port:443,path:'/',secure:true,debug:1,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}],iceCandidatePoolSize:10}});
     MP.peer.on('open',id=>{
       $('roomCode').textContent='CÓDIGO: '+id;
       $('btnCopyCode').style.display='inline-block';
@@ -1438,12 +1443,13 @@ async function mpJoinRoom(){
   mpDisconnect(); MP.isHost=false; MP.code=code;
   mpStatus('Conectando a '+code+'...');
   try{
-    MP.peer=new Peer({host:'0.peerjs.com',port:443,path:'/',secure:true,debug:1});
+    MP.peer=new Peer({host:'0.peerjs.com',port:443,path:'/',secure:true,debug:1,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'}],iceCandidatePoolSize:10}});
     MP.peer.on('open',()=>{const conn=MP.peer.connect(code,{reliable:true});mpAttach(conn);});
     MP.peer.on('error',err=>mpStatus('No se pudo conectar: '+(err.type||'error')+'.'));
   }catch(e){mpStatus('No se pudo iniciar PeerJS.');}
 }
 function mpDisconnect(){
+  if(MP.connectTimer){clearTimeout(MP.connectTimer);MP.connectTimer=null;}
   if(MP.conn){try{MP.conn.close();}catch(e){}}
   if(MP.peer){try{MP.peer.destroy();}catch(e){}}
   MP.peer=null;MP.conn=null;MP.remote=null;MP.code='';S.multiplayer=false;
