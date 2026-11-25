@@ -1,0 +1,3041 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EN ESTE PUEBLO — SHORTS 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cargador multi-CDN de Three.js con respaldo automático -->
+    <script>
+        (function loadThreeWithFallback() {
+            const cdns = [
+                'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+                'https://unpkg.com/three@0.128.0/build/three.min.js',
+                'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+            ];
+            let idx = 0;
+            function tryNext() {
+                if (window.THREE || idx >= cdns.length) return;
+                const s = document.createElement('script');
+                s.src = cdns[idx++];
+                s.async = false;
+                s.onerror = tryNext;
+                document.head.appendChild(s);
+            }
+            if (!window.THREE) {
+                tryNext();
+            }
+        })();
+    </script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #090d16;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            cursor: grab;
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        .cinematic-vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: inset 0 0 95px rgba(0, 0, 0, 0.55);
+        }
+        .viral-subtitle {
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            line-height: 1.22;
+            color: #ffffff;
+            text-shadow:
+                -2px -2px 0 #000,
+                 2px -2px 0 #000,
+                -2px  2px 0 #000,
+                 2px  2px 0 #000,
+                 0px  3px 0 #000;
+        }
+        .sub-pop {
+            animation: subPopIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes subPopIn {
+            0% { transform: scale(0.86) translateY(8px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes screenShake {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-8px, 6px) rotate(-0.7deg); }
+            40% { transform: translate(8px, -6px) rotate(0.7deg); }
+            60% { transform: translate(-5px, -3px) rotate(-0.3deg); }
+            80% { transform: translate(5px, 3px) rotate(0.3deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .shake-active {
+            animation: screenShake 0.4s ease-out both;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 9999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(251, 191, 36, 0.35);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Contenedor principal del escenario 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Diagnóstico visible si WebGL o Three.js fallan -->
+    <div id="diagnostic-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-6">
+        <div class="max-w-md w-full bg-slate-900 border border-amber-400/40 rounded-2xl p-6 text-slate-100 shadow-2xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 font-black">!</div>
+                <h2 class="text-base font-black uppercase tracking-wider text-amber-300">Diagnóstico Gráfico 3D</h2>
+            </div>
+            <p id="diagnostic-message" class="text-sm text-slate-300 leading-relaxed mb-4">
+                No se pudo inicializar el contexto WebGL o la librería 3D en este navegador.
+            </p>
+            <button id="btn-retry-diag" class="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition cursor-pointer">
+                Reintentar Inicialización
+            </button>
+        </div>
+    </div>
+
+    <!-- Viñeta y destello de impacto -->
+    <div class="cinematic-vignette"></div>
+    <div id="impact-flash" class="fixed inset-0 z-10 bg-white opacity-0 pointer-events-none transition-opacity duration-150"></div>
+
+    <!-- Barra Superior: Marca, Música Dreamcore y Controles -->
+    <header class="fixed top-0 left-0 right-0 z-30 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- Identidad y estado del episodio -->
+        <div class="pointer-events-auto flex items-center gap-3 bg-slate-950/85 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2 shadow-xl">
+            <div class="w-8 h-8 rounded-lg bg-amber-400 flex items-center justify-center shadow-inner shrink-0">
+                <svg class="w-5 h-5 text-slate-950 fill-current" viewBox="0 0 24 24">
+                    <path d="M5 3l14 3.5L15.5 21 1.5 17.5 5 3zm5.2 6.8l-1 4 4 1 1-4-4-1z"/>
+                </svg>
+            </div>
+            <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-white font-black text-xs sm:text-sm tracking-wide uppercase">EN ESTE PUEBLO — SHORTS 3D</h1>
+                    <span id="music-status-pill" class="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-purple-500/20 text-purple-200 border border-purple-400/30">
+                        DREAMCORE OFF
+                    </span>
+                </div>
+                <p id="current-ep-header" class="text-slate-300 text-[11px] sm:text-xs font-medium truncate max-w-[200px] sm:max-w-xs">
+                    Ep. 1 — El Robo de la Bloxy Cola Dorada
+                </p>
+            </div>
+        </div>
+
+        <!-- Controles de Reproducción, Música Dreamcore, Cámara y Historias -->
+        <div class="pointer-events-auto flex flex-wrap items-center gap-1.5">
+            <!-- Episodio Anterior -->
+            <button id="btn-prev" title="Episodio anterior" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+                </svg>
+            </button>
+
+            <!-- Pausar / Reanudar -->
+            <button id="btn-pause" title="Pausar / Reanudar" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg id="icon-pause" class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+                </svg>
+                <svg id="icon-resume" class="hidden w-4 h-4 fill-current ml-0.5" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+            </button>
+
+            <!-- Reiniciar Episodio -->
+            <button id="btn-restart" title="Reiniciar episodio" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </button>
+
+            <!-- Siguiente Episodio -->
+            <button id="btn-next" title="Siguiente episodio" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                </svg>
+            </button>
+
+            <!-- Autoplay continuo -->
+            <button id="btn-autoplay" title="Autoplay de historias" class="flex items-center gap-1 px-2.5 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-amber-300 border border-amber-400/50 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer text-[11px] font-bold">
+                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/>
+                </svg>
+                <span class="hidden md:inline">AUTO</span>
+            </button>
+
+            <!-- Música Dreamcore (7 Weeks & 3 Days) -->
+            <button id="btn-dreamcore" title="Música Dreamcore (7 Weeks & 3 Days)" class="flex items-center gap-1.5 px-2.5 h-9 rounded-xl bg-slate-950/85 hover:bg-purple-950/80 text-purple-200 border border-purple-400/35 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer text-[11px] font-bold">
+                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/>
+                </svg>
+                <span id="dreamcore-label">MÚSICA DREAMCORE</span>
+            </button>
+
+            <!-- Panel de ajustes de Música Dreamcore y archivo local -->
+            <button id="btn-music-panel" title="Ajustes de Música Dreamcore y archivo de audio" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-purple-200 border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                </svg>
+            </button>
+
+            <!-- Alternar Cámara Cinemática / Libre -->
+            <button id="btn-cam-toggle" title="Cámara Cinemática / Cámara Libre" class="flex items-center gap-1 px-2.5 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer text-[11px] font-bold">
+                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <span id="cam-mode-label">CINE</span>
+            </button>
+
+            <!-- Sonido FX opcional -->
+            <button id="btn-sound" title="Activar / Silenciar Efectos de Sonido" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-800 text-white border border-white/15 backdrop-blur-md shadow-lg transition active:scale-90 cursor-pointer">
+                <svg id="icon-vol-on" class="hidden w-4 h-4 fill-none stroke-current stroke-2 text-amber-300" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+                </svg>
+                <svg id="icon-vol-off" class="w-4 h-4 fill-none stroke-current stroke-2 text-slate-400" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+                </svg>
+            </button>
+
+            <!-- Abrir / Cerrar Catálogo de 10 Historias -->
+            <button id="btn-drawer" title="Lista de 10 historias" class="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold shadow-lg transition active:scale-90 cursor-pointer text-[11px]">
+                <svg class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                <span>HISTORIAS (10)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Panel Flotante de Música Dreamcore (7 Weeks & 3 Days + Archivo Local) -->
+    <section id="music-panel" class="hidden fixed top-16 sm:top-20 right-3 sm:right-5 z-30 w-[calc(100vw-1.5rem)] max-w-xs bg-slate-950/92 backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-2xl p-4 text-slate-100">
+        <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
+            <div>
+                <h2 class="text-xs font-black uppercase tracking-wider text-purple-200">7 Weeks & 3 Days — Dreamcore</h2>
+                <p id="music-source-label" class="text-[11px] text-slate-400">Sintetizador Onírico (Pads + Caja Musical)</p>
+            </div>
+            <button id="btn-close-music" class="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer" title="Cerrar panel de música">
+                <svg class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="space-y-3">
+            <div>
+                <div class="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1">
+                    <span>Volumen Dreamcore</span>
+                    <span id="dreamcore-vol-val" class="text-purple-300">55%</span>
+                </div>
+                <input id="dreamcore-volume" type="range" min="0" max="100" value="55" class="w-full accent-purple-400 cursor-pointer">
+            </div>
+
+            <div class="pt-2 border-t border-white/10">
+                <label for="audio-file-input" class="block text-[11px] font-bold text-slate-300 mb-1.5">
+                    Cargar pista local (.mp3 / .wav / .ogg)
+                </label>
+                <div class="flex items-center gap-2">
+                    <input id="audio-file-input" type="file" accept=".mp3,.wav,.ogg,audio/*" class="block w-full text-[11px] text-slate-300 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-purple-500/25 file:text-purple-200 hover:file:bg-purple-500/40 cursor-pointer">
+                    <button id="btn-reset-synth-music" title="Volver al sintetizador Dreamcore" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-white/10 transition cursor-pointer shrink-0">
+                        Synth
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Panel Lateral de 10 Historias con Buscador y Filtros -->
+    <aside id="episodes-drawer" class="fixed top-16 sm:top-20 right-3 sm:right-5 z-30 w-[calc(100vw-1.5rem)] max-w-sm bg-slate-950/92 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl p-3.5 transition-all duration-200">
+        <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-400 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
+                </svg>
+                <span class="text-white font-extrabold text-xs uppercase tracking-wider">Temporada Completa — 10 Historias</span>
+            </div>
+            <button id="btn-close-drawer" class="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer" title="Ocultar lista">
+                <svg class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Buscador -->
+        <div class="mb-2.5">
+            <input id="episode-search" type="text" placeholder="Buscar historia o personaje..." class="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-white/15 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 transition">
+        </div>
+
+        <!-- Filtros por categoría -->
+        <div id="category-filters" class="flex flex-wrap gap-1.5 mb-2.5"></div>
+
+        <!-- Lista de episodios -->
+        <div id="episodes-list" class="space-y-2 max-h-[52vh] overflow-y-auto custom-scroll pr-1"></div>
+    </aside>
+
+    <!-- Subtítulos sincronizados + Barra de progreso -->
+    <div class="fixed bottom-4 sm:bottom-7 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-2xl flex flex-col items-center gap-2.5 pointer-events-none px-2">
+        <div id="subtitle-box" class="inline-block bg-black/82 backdrop-blur-md border-2 border-white/25 rounded-2xl px-5 py-3 shadow-2xl transition-opacity duration-200 opacity-0 text-center">
+            <p id="subtitle-text" class="viral-subtitle text-lg sm:text-2xl md:text-3xl"></p>
+        </div>
+        <div class="w-full max-w-md bg-slate-950/80 border border-white/15 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+            <div id="story-progress-bar" class="h-full bg-gradient-to-r from-purple-400 via-amber-400 to-yellow-300 w-0 transition-all duration-75"></div>
+        </div>
+    </div>
+
+    <script>
+    (function initApplication() {
+        const diagOverlay = document.getElementById('diagnostic-overlay');
+        const diagMessage = document.getElementById('diagnostic-message');
+        const btnRetryDiag = document.getElementById('btn-retry-diag');
+
+        function showDiagnostic(msg) {
+            diagMessage.textContent = msg;
+            diagOverlay.classList.remove('hidden');
+        }
+
+        btnRetryDiag.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        function waitForThreeAndStart(attempt = 0) {
+            if (typeof THREE !== 'undefined') {
+                startScene();
+                return;
+            }
+            if (attempt < 40) {
+                setTimeout(() => waitForThreeAndStart(attempt + 1), 100);
+            } else {
+                showDiagnostic('No se pudo cargar la librería Three.js desde las redes CDN. Revisa tu conexión o recarga la página.');
+            }
+        }
+
+        function startScene() {
+            // Verificar soporte WebGL antes de crear el renderer
+            const testCanvas = document.createElement('canvas');
+            const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+            if (!gl) {
+                showDiagnostic('Tu navegador o dispositivo no tiene WebGL habilitado o disponible en este momento.');
+                return;
+            }
+
+            /**
+             * ====================================================================
+             * 1. MOTOR DE MÚSICA DREAMCORE ("7 WEEKS & 3 DAYS") + FX SINTETIZADOS
+             * ====================================================================
+             */
+            class DreamcoreMusicEngine {
+                constructor() {
+                    this.ctx = null;
+                    this.masterGain = null;
+                    this.synthGain = null;
+                    this.fileGain = null;
+                    this.reverbDelay = null;
+                    this.reverbFeedback = null;
+                    this.enabled = false;
+                    this.volume = 0.55;
+                    this.stepIndex = 0;
+                    this.timerId = null;
+                    this.customAudio = null;
+                    this.customObjectUrl = null;
+                    this.usingCustomTrack = false;
+
+                    // Progresión melancólica-onírica en La menor / Fa mayor / Do mayor / Sol mayor
+                    // Inspirada en atmósferas dreamcore tipo "7 Weeks & 3 Days"
+                    this.chords = [
+                        [220.00, 261.63, 329.63, 392.00], // Am7
+                        [174.61, 220.00, 261.63, 349.23], // Fmaj7
+                        [261.63, 329.63, 392.00, 493.88], // Cmaj7
+                        [196.00, 246.94, 293.66, 392.00]  // G6
+                    ];
+
+                    // Notas de caja musical / campana etérea (en Hz)
+                    this.bellNotes = [
+                        440.00, 523.25, 659.25, 587.33,
+                        523.25, 440.00, 392.00, 440.00,
+                        523.25, 659.25, 783.99, 659.25,
+                        587.33, 493.88, 392.00, 493.88
+                    ];
+                }
+
+                ensureContext() {
+                    if (!this.ctx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioCtx) return false;
+                        this.ctx = new AudioCtx();
+
+                        this.masterGain = this.ctx.createGain();
+                        this.masterGain.gain.value = this.enabled ? this.volume : 0.0001;
+
+                        // Bus de sintetizador dreamcore con filtro pasa-bajos suave
+                        const lowpass = this.ctx.createBiquadFilter();
+                        lowpass.type = 'lowpass';
+                        lowpass.frequency.value = 1850;
+                        lowpass.Q.value = 0.7;
+
+                        this.synthGain = this.ctx.createGain();
+                        this.synthGain.gain.value = 0.32;
+
+                        // Eco espacial / reverb sintética
+                        this.reverbDelay = this.ctx.createDelay(2.0);
+                        this.reverbDelay.delayTime.value = 0.38;
+
+                        this.reverbFeedback = this.ctx.createGain();
+                        this.reverbFeedback.gain.value = 0.42;
+
+                        const dampFilter = this.ctx.createBiquadFilter();
+                        dampFilter.type = 'lowpass';
+                        dampFilter.frequency.value = 1350;
+
+                        this.reverbDelay.connect(dampFilter);
+                        dampFilter.connect(this.reverbFeedback);
+                        this.reverbFeedback.connect(this.reverbDelay);
+
+                        this.synthGain.connect(lowpass);
+                        lowpass.connect(this.masterGain);
+                        lowpass.connect(this.reverbDelay);
+                        dampFilter.connect(this.masterGain);
+
+                        this.fileGain = this.ctx.createGain();
+                        this.fileGain.gain.value = 0.85;
+                        this.fileGain.connect(this.masterGain);
+
+                        this.masterGain.connect(this.ctx.destination);
+                    }
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                    return true;
+                }
+
+                playDreamPadChord(chordFreqs, durationSec) {
+                    if (!this.ctx || !this.enabled || this.usingCustomTrack) return;
+                    const now = this.ctx.currentTime;
+
+                    chordFreqs.forEach((freq, i) => {
+                        // Dos osciladores ligeramente desafinados para textura dreamcore / cinta
+                        [-4.5, 4.5].forEach(detuneCents => {
+                            const osc = this.ctx.createOscillator();
+                            const noteGain = this.ctx.createGain();
+                            osc.type = i === 0 ? 'sine' : 'triangle';
+                            osc.frequency.setValueAtTime(freq, now);
+                            osc.detune.setValueAtTime(detuneCents, now);
+
+                            noteGain.gain.setValueAtTime(0.0001, now);
+                            noteGain.gain.linearRampToValueAtTime(0.055, now + 0.65);
+                            noteGain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
+
+                            osc.connect(noteGain);
+                            noteGain.connect(this.synthGain);
+
+                            osc.start(now);
+                            osc.stop(now + durationSec + 0.05);
+                        });
+                    });
+                }
+
+                playMusicBoxBell(freq) {
+                    if (!this.ctx || !this.enabled || this.usingCustomTrack) return;
+                    const now = this.ctx.currentTime;
+
+                    const osc = this.ctx.createOscillator();
+                    const overtone = this.ctx.createOscillator();
+                    const bellGain = this.ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+                    // Ligero vibrato de cinta analógica
+                    osc.detune.setValueAtTime((Math.random() - 0.5) * 8, now);
+
+                    overtone.type = 'sine';
+                    overtone.frequency.setValueAtTime(freq * 2.0, now);
+
+                    const overtoneGain = this.ctx.createGain();
+                    overtoneGain.gain.setValueAtTime(0.02, now);
+                    overtoneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+
+                    bellGain.gain.setValueAtTime(0.0001, now);
+                    bellGain.gain.linearRampToValueAtTime(0.085, now + 0.02);
+                    bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.35);
+
+                    osc.connect(bellGain);
+                    overtone.connect(overtoneGain);
+                    overtoneGain.connect(bellGain);
+                    bellGain.connect(this.synthGain);
+
+                    osc.start(now);
+                    overtone.start(now);
+                    osc.stop(now + 1.4);
+                    overtone.stop(now + 1.4);
+                }
+
+                playSoftPulse(freq) {
+                    if (!this.ctx || !this.enabled || this.usingCustomTrack) return;
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq * 0.5, now);
+                    g.gain.setValueAtTime(0.0001, now);
+                    g.gain.linearRampToValueAtTime(0.07, now + 0.08);
+                    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+                    osc.connect(g);
+                    g.connect(this.synthGain);
+                    osc.start(now);
+                    osc.stop(now + 0.7);
+                }
+
+                scheduleStep() {
+                    if (!this.enabled) return;
+                    if (!this.usingCustomTrack) {
+                        const chordIdx = Math.floor(this.stepIndex / 4) % this.chords.length;
+                        const stepInBar = this.stepIndex % 4;
+                        const currentChord = this.chords[chordIdx];
+
+                        if (stepInBar === 0) {
+                            this.playDreamPadChord(currentChord, 2.75);
+                            this.playSoftPulse(currentChord[0]);
+                        }
+                        const bellFreq = this.bellNotes[this.stepIndex % this.bellNotes.length];
+                        this.playMusicBoxBell(bellFreq);
+                        this.stepIndex++;
+                    }
+                }
+
+                start() {
+                    if (!this.ensureContext()) return;
+                    this.enabled = true;
+                    if (this.masterGain && this.ctx) {
+                        this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+                        this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.15);
+                    }
+                    if (this.usingCustomTrack && this.customAudio) {
+                        this.customAudio.play().catch(() => {});
+                    } else {
+                        clearInterval(this.timerId);
+                        this.scheduleStep();
+                        // Pulso suave de 680 ms (~88 BPM en corcheas etéreas)
+                        this.timerId = setInterval(() => this.scheduleStep(), 680);
+                    }
+                }
+
+                stop() {
+                    this.enabled = false;
+                    clearInterval(this.timerId);
+                    this.timerId = null;
+                    if (this.masterGain && this.ctx) {
+                        this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+                        this.masterGain.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.12);
+                    }
+                    if (this.customAudio) {
+                        this.customAudio.pause();
+                    }
+                }
+
+                toggle() {
+                    if (this.enabled) {
+                        this.stop();
+                    } else {
+                        this.start();
+                    }
+                    return this.enabled;
+                }
+
+                setVolume(normVol) {
+                    this.volume = Math.max(0, Math.min(1, normVol));
+                    if (this.masterGain && this.ctx && this.enabled) {
+                        this.masterGain.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.06);
+                    }
+                }
+
+                loadLocalFile(file) {
+                    if (!file) return;
+                    if (!this.ensureContext()) return;
+                    if (this.customObjectUrl) {
+                        URL.revokeObjectURL(this.customObjectUrl);
+                    }
+                    this.customObjectUrl = URL.createObjectURL(file);
+                    if (!this.customAudio) {
+                        this.customAudio = new Audio();
+                        this.customAudio.loop = true;
+                        this.customAudio.crossOrigin = 'anonymous';
+                        const sourceNode = this.ctx.createMediaElementSource(this.customAudio);
+                        sourceNode.connect(this.fileGain);
+                    }
+                    this.customAudio.src = this.customObjectUrl;
+                    this.usingCustomTrack = true;
+                    this.enabled = true;
+                    this.start();
+                }
+
+                useBuiltInSynth() {
+                    this.usingCustomTrack = false;
+                    if (this.customAudio) {
+                        this.customAudio.pause();
+                    }
+                    if (this.enabled) {
+                        this.start();
+                    }
+                }
+            }
+
+            class SoundFX {
+                constructor(musicEngine) {
+                    this.musicEngine = musicEngine;
+                    this.enabled = false;
+                }
+                getCtx() {
+                    if (!this.musicEngine.ensureContext()) return null;
+                    return this.musicEngine.ctx;
+                }
+                toggle() {
+                    this.musicEngine.ensureContext();
+                    this.enabled = !this.enabled;
+                    return this.enabled;
+                }
+                playOof() {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(195, now);
+                    osc.frequency.exponentialRampToValueAtTime(78, now + 0.28);
+                    gain.gain.setValueAtTime(0.32, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.31);
+                }
+                playBoom() {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(132, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.7);
+                    gain.gain.setValueAtTime(0.65, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.76);
+                }
+                playSwordSlash() {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(920, now);
+                    osc.frequency.exponentialRampToValueAtTime(180, now + 0.22);
+                    gain.gain.setValueAtTime(0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+                playLaser() {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(760, now);
+                    osc.frequency.exponentialRampToValueAtTime(140, now + 0.55);
+                    gain.gain.setValueAtTime(0.24, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                }
+                playStep(pitch = 1.0) {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(225 * pitch, now);
+                    osc.frequency.exponentialRampToValueAtTime(88 * pitch, now + 0.05);
+                    gain.gain.setValueAtTime(0.09, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                }
+                playEpicChord() {
+                    if (!this.enabled) return;
+                    const ctx = this.getCtx();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+                    [261.63, 329.63, 392.00, 523.25].forEach(f => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(f, now);
+                        gain.gain.setValueAtTime(0.07, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.95);
+                    });
+                }
+            }
+
+            const dreamcoreMusic = new DreamcoreMusicEngine();
+            const sfx = new SoundFX(dreamcoreMusic);
+
+            /**
+             * ====================================================================
+             * 2. TEXTURAS PROCEDURALES (STUDS, 5 CARAS CLÁSICAS Y CARTEL DEL PUEBLO)
+             * ====================================================================
+             */
+            function createStudTexture(baseColor, shadowColor, repeatX = 1, repeatY = 1) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = baseColor;
+                ctx.fillRect(0, 0, 128, 128);
+
+                ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(0, 0, 128, 128);
+
+                const cx = 64, cy = 64, r = 34;
+                ctx.beginPath();
+                ctx.arc(cx, cy + 4, r, 0, Math.PI * 2);
+                ctx.fillStyle = shadowColor;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = baseColor;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, r - 2, Math.PI * 1.1, Math.PI * 1.9);
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                ctx.lineWidth = 3.5;
+                ctx.stroke();
+
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(repeatX, repeatY);
+                return tex;
+            }
+
+            function createTownSignTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, 1024, 256);
+
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 14;
+                ctx.strokeRect(16, 16, 992, 224);
+
+                ctx.fillStyle = '#facc15';
+                ctx.font = '900 74px Inter, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('EN ESTE PUEBLO', 512, 130);
+
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            function createRobloxFaceTexture(type, skinColor = '#F5CD30') {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = skinColor;
+                ctx.fillRect(0, 0, 512, 512);
+
+                ctx.save();
+                ctx.translate(256, 265);
+
+                if (type === 'happy') {
+                    ctx.fillStyle = '#111111';
+                    ctx.beginPath();
+                    ctx.ellipse(-56, -34, 15, 23, 0, 0, Math.PI * 2);
+                    ctx.ellipse(56, -34, 15, 23, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(-60, -41, 5.5, 0, Math.PI * 2);
+                    ctx.arc(52, -41, 5.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#111111';
+                    ctx.lineWidth = 14;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.arc(0, 8, 66, 0.22 * Math.PI, 0.78 * Math.PI);
+                    ctx.stroke();
+
+                } else if (type === 'shock') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.strokeStyle = '#111111';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.arc(-56, -38, 25, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(56, -38, 25, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+
+                    ctx.fillStyle = '#111111';
+                    ctx.beginPath();
+                    ctx.arc(-56, -38, 8, 0, Math.PI * 2);
+                    ctx.arc(56, -38, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#450a0a';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 42, 24, 34, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                } else if (type === 'man') {
+                    ctx.strokeStyle = '#18181b';
+                    ctx.fillStyle = '#18181b';
+                    ctx.lineCap = 'round';
+
+                    ctx.lineWidth = 14;
+                    ctx.beginPath();
+                    ctx.moveTo(-92, -62);
+                    ctx.lineTo(-42, -52);
+                    ctx.lineTo(-28, -42);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(92, -56);
+                    ctx.lineTo(44, -52);
+                    ctx.lineTo(28, -44);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.ellipse(-56, -32, 21, 11, 0.06, 0, Math.PI * 2);
+                    ctx.ellipse(56, -32, 21, 11, -0.06, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#111111';
+                    ctx.beginPath();
+                    ctx.arc(-55, -32, 9, 0, Math.PI * 2);
+                    ctx.arc(55, -32, 9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(-58, -35, 3, 0, Math.PI * 2);
+                    ctx.arc(52, -35, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(-4, -18);
+                    ctx.lineTo(-10, 12);
+                    ctx.lineTo(4, 15);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#18181b';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(-58, 42);
+                    ctx.quadraticCurveTo(-5, 62, 64, 34);
+                    ctx.stroke();
+
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(67, 31, 8, 0.6 * Math.PI, 1.3 * Math.PI);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.arc(0, 68, 22, 0.2 * Math.PI, 0.8 * Math.PI);
+                    ctx.stroke();
+
+                } else if (type === 'epic') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 9;
+
+                    ctx.beginPath();
+                    ctx.ellipse(-52, -46, 30, 34, -0.1, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.ellipse(52, -46, 30, 34, 0.1, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(-42, -48, 12, 0, Math.PI * 2);
+                    ctx.arc(62, -48, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#7f1d1d';
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 10;
+                    ctx.beginPath();
+                    ctx.moveTo(-88, 2);
+                    ctx.quadraticCurveTo(0, 14, 88, 2);
+                    ctx.bezierCurveTo(92, 98, -92, 98, -88, 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.save();
+                    ctx.clip();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(-95, -5, 190, 28);
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(-95, 23);
+                    ctx.quadraticCurveTo(0, 30, 95, 23);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 76, 46, 28, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-88, 2);
+                    ctx.quadraticCurveTo(0, 14, 88, 2);
+                    ctx.bezierCurveTo(92, 98, -92, 98, -88, 2);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                } else if (type === 'winning') {
+                    ctx.fillStyle = '#111111';
+                    ctx.beginPath();
+                    ctx.ellipse(-54, -40, 14, 21, 0, 0, Math.PI * 2);
+                    ctx.ellipse(54, -40, 14, 21, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(-58, -46, 5, 0, Math.PI * 2);
+                    ctx.arc(50, -46, 5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.strokeStyle = '#111111';
+                    ctx.lineWidth = 9;
+                    ctx.beginPath();
+                    ctx.moveTo(-78, 14);
+                    ctx.quadraticCurveTo(0, 24, 78, 14);
+                    ctx.quadraticCurveTo(72, 74, 0, 74);
+                    ctx.quadraticCurveTo(-72, 74, -78, 14);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(-74, 44);
+                    ctx.quadraticCurveTo(0, 50, 74, 44);
+                    for (let x = -45; x <= 45; x += 22) {
+                        ctx.moveTo(x, 18);
+                        ctx.lineTo(x, 70);
+                    }
+                    ctx.stroke();
+
+                } else if (type === 'chill') {
+                    ctx.strokeStyle = '#18181b';
+                    ctx.lineWidth = 10;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(-84, -52);
+                    ctx.lineTo(-32, -48);
+                    ctx.moveTo(32, -48);
+                    ctx.lineTo(84, -52);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#18181b';
+                    ctx.beginPath();
+                    ctx.ellipse(-56, -28, 18, 9, 0, 0, Math.PI * 2);
+                    ctx.ellipse(56, -28, 18, 9, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(-60, -30, 3.5, 0, Math.PI * 2);
+                    ctx.arc(52, -30, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.lineWidth = 9;
+                    ctx.beginPath();
+                    ctx.moveTo(-46, 36);
+                    ctx.quadraticCurveTo(8, 54, 62, 26);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            // En CylinderGeometry, u = 0 inicia en +X; offset.x = 0.25 centra la cara en el frente (+Z)
+            texture.offset.x = 0.25;
+            return texture;
+        }
+
+        /**
+         * ========================================================================
+         * 3. ESCENARIO DEL PUEBLO CLÁSICO ROBLOX
+         * ========================================================================
+         */
+            const container = document.getElementById('canvas-container');
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x7dd3fc);
+            scene.fog = new THREE.FogExp2(0x7dd3fc, 0.007);
+
+            const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 450);
+            camera.position.set(0, 6, 15);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3f6212, 0.78);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.05);
+            dirLight.position.set(28, 48, 25);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            const d = 44;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            const sunMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(8, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xfef08a })
+            );
+            sunMesh.position.set(55, 75, -65);
+            scene.add(sunMesh);
+
+            // Baseplate con studs
+            const baseplate = new THREE.Mesh(
+                new THREE.BoxGeometry(160, 1, 160),
+                new THREE.MeshStandardMaterial({ map: createStudTexture('#4ade80', '#22c55e', 80, 80), roughness: 0.55 })
+            );
+            baseplate.position.y = -0.5;
+            baseplate.receiveShadow = true;
+            scene.add(baseplate);
+
+            // Plaza central
+            const plaza = new THREE.Mesh(
+                new THREE.BoxGeometry(38, 0.12, 34),
+                new THREE.MeshStandardMaterial({ map: createStudTexture('#cbd5e1', '#94a3b8', 19, 17) })
+            );
+            plaza.position.y = 0.06;
+            plaza.receiveShadow = true;
+            scene.add(plaza);
+
+            // Cartel monumental "EN ESTE PUEBLO" sobre pórtico
+            const townSignGroup = new THREE.Group();
+            townSignGroup.position.set(0, 0, -14.5);
+            const postLeft = new THREE.Mesh(new THREE.BoxGeometry(0.8, 7.5, 0.8), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            postLeft.position.set(-6.2, 3.75, 0);
+            postLeft.castShadow = true;
+            const postRight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 7.5, 0.8), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            postRight.position.set(6.2, 3.75, 0);
+            postRight.castShadow = true;
+            const signBoard = new THREE.Mesh(
+                new THREE.BoxGeometry(13.6, 3.2, 0.6),
+                [
+                    new THREE.MeshStandardMaterial({ color: 0x0f172a }),
+                    new THREE.MeshStandardMaterial({ color: 0x0f172a }),
+                    new THREE.MeshStandardMaterial({ color: 0xfacc15 }),
+                    new THREE.MeshStandardMaterial({ color: 0x0f172a }),
+                    new THREE.MeshStandardMaterial({ map: createTownSignTexture() }),
+                    new THREE.MeshStandardMaterial({ map: createTownSignTexture() })
+                ]
+            );
+            signBoard.position.set(0, 6.2, 0);
+            signBoard.castShadow = true;
+            townSignGroup.add(postLeft, postRight, signBoard);
+            scene.add(townSignGroup);
+
+            // Línea de meta
+            const finishLine = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 0.14, 14),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.3 })
+            );
+            finishLine.position.set(11, 0.07, 4);
+            finishLine.visible = false;
+            scene.add(finishLine);
+
+            // Fuente central
+            const fountainGroup = new THREE.Group();
+            fountainGroup.position.set(0, 0, -8.5);
+            const fBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(4.2, 4.5, 0.9, 12),
+                new THREE.MeshStandardMaterial({ map: createStudTexture('#e2e8f0', '#94a3b8', 4, 1) })
+            );
+            fBase.position.y = 0.45;
+            fBase.castShadow = true;
+            fBase.receiveShadow = true;
+            const waterMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(3.7, 3.7, 0.75, 12),
+                new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 })
+            );
+            waterMesh.position.y = 0.52;
+            const fPillar = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 2.8, 1.2),
+                new THREE.MeshStandardMaterial({ map: createStudTexture('#cbd5e1', '#94a3b8', 1, 3) })
+            );
+            fPillar.position.y = 1.4;
+            fPillar.castShadow = true;
+            fountainGroup.add(fBase, waterMesh, fPillar);
+            scene.add(fountainGroup);
+
+            // Casas del pueblo
+            function createRobloxHouse(x, z, rotY, wallHex, shadowHex, roofHex) {
+                const house = new THREE.Group();
+                house.position.set(x, 0, z);
+                house.rotation.y = rotY;
+
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(10, 7, 9),
+                    new THREE.MeshStandardMaterial({ map: createStudTexture(wallHex, shadowHex, 6, 5) })
+                );
+                body.position.y = 3.5;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                house.add(body);
+
+                const roofGeo = new THREE.ConeGeometry(7.8, 4.2, 4);
+                roofGeo.rotateY(Math.PI / 4);
+                const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: roofHex }));
+                roof.position.y = 9.1;
+                roof.castShadow = true;
+                house.add(roof);
+
+                const door = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.1, 4.2, 0.3),
+                    new THREE.MeshStandardMaterial({ color: 0x78350f })
+                );
+                door.position.set(0, 2.1, 4.55);
+                house.add(door);
+
+                const winMat = new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x38bdf8, emissiveIntensity: 0.25 });
+                const winL = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 0.3), winMat);
+                winL.position.set(-2.9, 4.2, 4.55);
+                const winR = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 0.3), winMat);
+                winR.position.set(2.9, 4.2, 4.55);
+                house.add(winL, winR);
+
+                scene.add(house);
+            }
+
+            createRobloxHouse(-20, -15, 0.35, '#fef08a', '#eab308', '#dc2626');
+            createRobloxHouse(20, -15, -0.35, '#bae6fd', '#38bdf8', '#1d4ed8');
+            createRobloxHouse(-22, 11, Math.PI / 2, '#fecaca', '#f87171', '#b91c1c');
+            createRobloxHouse(22, 11, -Math.PI / 2, '#bbf7d0', '#4ade80', '#15803d');
+
+            // Árboles
+            function createRobloxTree(x, z) {
+                const tree = new THREE.Group();
+                tree.position.set(x, 0, z);
+                const trunk = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.4, 5.5, 1.4),
+                    new THREE.MeshStandardMaterial({ color: 0x713f12 })
+                );
+                trunk.position.y = 2.75;
+                trunk.castShadow = true;
+                const leaves = new THREE.Mesh(
+                    new THREE.BoxGeometry(5.2, 4.6, 5.2),
+                    new THREE.MeshStandardMaterial({ map: createStudTexture('#16a34a', '#15803d', 3, 3) })
+                );
+                leaves.position.y = 6.8;
+                leaves.castShadow = true;
+                tree.add(trunk, leaves);
+                scene.add(tree);
+            }
+
+            createRobloxTree(-13, -5);
+            createRobloxTree(13, -5);
+            createRobloxTree(-14, 17);
+            createRobloxTree(14, 17);
+
+            // Nubes
+            const clouds = [];
+            for (let i = 0; i < 10; i++) {
+                const cloud = new THREE.Mesh(
+                    new THREE.BoxGeometry(12 + Math.random() * 10, 2.2, 7 + Math.random() * 6),
+                    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
+                );
+                cloud.position.set((Math.random() - 0.5) * 140, 28 + Math.random() * 10, -25 - Math.random() * 50);
+                scene.add(cloud);
+                clouds.push(cloud);
+            }
+
+            /**
+             * ====================================================================
+             * 4. PERSONAJES ROBLOX R6 Y UTILERÍAS DE LOS 10 EPISODIOS
+             * ====================================================================
+             */
+            function createR6Character(options) {
+                const {
+                    faceType = 'happy',
+                    skinColor = '#F5CD30',
+                    torsoColor = '#2563EB',
+                    torsoShadow = '#1D4ED8',
+                    legColor = '#65A30D',
+                    legShadow = '#4D7C0F',
+                    hasCape = false
+                } = options;
+
+                const root = new THREE.Group();
+                const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.35 });
+                const torsoMat = new THREE.MeshStandardMaterial({ map: createStudTexture(torsoColor, torsoShadow, 2, 2), roughness: 0.4 });
+                const legMat = new THREE.MeshStandardMaterial({ map: createStudTexture(legColor, legShadow, 1, 2), roughness: 0.45 });
+
+                const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), torsoMat);
+                torso.position.y = 3;
+                torso.castShadow = true;
+                torso.receiveShadow = true;
+                root.add(torso);
+
+                let capePivot = null;
+                if (hasCape) {
+                    capePivot = new THREE.Group();
+                    capePivot.position.set(0, 3.95, -0.52);
+                    const capeMesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.1, 2.8, 0.14),
+                        new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 })
+                    );
+                    capeMesh.position.y = -1.35;
+                    capeMesh.castShadow = true;
+                    const capeTrim = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.14, 0.25, 0.16),
+                        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.5, roughness: 0.2 })
+                    );
+                    capeTrim.position.y = -2.65;
+                    capePivot.add(capeMesh, capeTrim);
+                    capePivot.rotation.x = 0.25;
+                    root.add(capePivot);
+                }
+
+                const headPivot = new THREE.Group();
+                headPivot.position.set(0, 4.0, 0);
+                root.add(headPivot);
+
+                const faceTex = createRobloxFaceTexture(faceType, skinColor);
+                const headSideMat = new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.3 });
+                const headCapMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.3 });
+
+                const headMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.64, 0.64, 1.18, 24),
+                    [headSideMat, headCapMat, headCapMat]
+                );
+                headMesh.position.y = 0.62;
+                headMesh.castShadow = true;
+                headPivot.add(headMesh);
+
+                const headStud = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 16), headCapMat);
+                headStud.position.y = 1.26;
+                headPivot.add(headStud);
+
+                const leftArmPivot = new THREE.Group();
+                leftArmPivot.position.set(-1.5, 3.85, 0);
+                const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), skinMat);
+                leftArm.position.y = -0.85;
+                leftArm.castShadow = true;
+                leftArmPivot.add(leftArm);
+                root.add(leftArmPivot);
+
+                const rightArmPivot = new THREE.Group();
+                rightArmPivot.position.set(1.5, 3.85, 0);
+                const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), skinMat);
+                rightArm.position.y = -0.85;
+                rightArm.castShadow = true;
+                rightArmPivot.add(rightArm);
+                root.add(rightArmPivot);
+
+                const leftLegPivot = new THREE.Group();
+                leftLegPivot.position.set(-0.5, 2.0, 0);
+                const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), legMat);
+                leftLeg.position.y = -1.0;
+                leftLeg.castShadow = true;
+                leftLegPivot.add(leftLeg);
+                root.add(leftLegPivot);
+
+                const rightLegPivot = new THREE.Group();
+                rightLegPivot.position.set(0.5, 2.0, 0);
+                const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), legMat);
+                rightLeg.position.y = -1.0;
+                rightLeg.castShadow = true;
+                rightLegPivot.add(rightLeg);
+                root.add(rightLegPivot);
+
+                scene.add(root);
+
+                return {
+                    root,
+                    torso,
+                    headPivot,
+                    headMesh,
+                    leftArmPivot,
+                    rightArmPivot,
+                    leftLegPivot,
+                    rightLegPivot,
+                    capePivot,
+                    skinColor,
+                    setFace(newType) {
+                        const newTex = createRobloxFaceTexture(newType, this.skinColor);
+                        this.headMesh.material[0].map = newTex;
+                        this.headMesh.material[0].needsUpdate = true;
+                    }
+                };
+            }
+
+            const happyChar = createR6Character({
+                faceType: 'happy',
+                skinColor: '#F5CD30',
+                torsoColor: '#2563EB',
+                torsoShadow: '#1D4ED8',
+                legColor: '#65A30D',
+                legShadow: '#4D7C0F'
+            });
+
+            const manChar = createR6Character({
+                faceType: 'man',
+                skinColor: '#FDE68A',
+                torsoColor: '#1E293B',
+                torsoShadow: '#0F172A',
+                legColor: '#111827',
+                legShadow: '#030712'
+            });
+
+            const epicChar = createR6Character({
+                faceType: 'epic',
+                skinColor: '#FACC15',
+                torsoColor: '#F59E0B',
+                torsoShadow: '#D97706',
+                legColor: '#B91C1C',
+                legShadow: '#991B1B',
+                hasCape: true
+            });
+
+            const chillChar = createR6Character({
+                faceType: 'chill',
+                skinColor: '#F5CD30',
+                torsoColor: '#0D9488',
+                torsoShadow: '#0F766E',
+                legColor: '#334155',
+                legShadow: '#1E293B'
+            });
+
+            const giantChar = createR6Character({
+                faceType: 'winning',
+                skinColor: '#F5CD30',
+                torsoColor: '#DC2626',
+                torsoShadow: '#991B1B',
+                legColor: '#1D4ED8',
+                legShadow: '#1E3A8A'
+            });
+
+            // Prop 1: Bloxy Cola Dorada
+            const bloxyColaGroup = new THREE.Group();
+            const canBody = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.28, 0.28, 0.8, 16),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.2, emissive: 0xca8a04, emissiveIntensity: 0.4 })
+            );
+            const canStripe = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.288, 0.288, 0.25, 16),
+                new THREE.MeshStandardMaterial({ color: 0xdc2626 })
+            );
+            bloxyColaGroup.add(canBody, canStripe);
+            scene.add(bloxyColaGroup);
+
+            // Prop 2: Linked Sword Clásica
+            const linkedSwordGroup = new THREE.Group();
+            const blade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.18, 2.8, 0.42),
+                new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.15, emissive: 0x38bdf8, emissiveIntensity: 0.25 })
+            );
+            blade.position.y = 1.6;
+            const guard = new THREE.Mesh(
+                new THREE.BoxGeometry(0.28, 0.24, 1.2),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7 })
+            );
+            guard.position.y = 0.2;
+            const hilt = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.12, 0.7, 12),
+                new THREE.MeshStandardMaterial({ color: 0x1e293b })
+            );
+            hilt.position.y = -0.25;
+            linkedSwordGroup.add(blade, guard, hilt);
+            scene.add(linkedSwordGroup);
+
+            // Prop 3: Pizza y Piedra
+            const pizzaBoxGroup = new THREE.Group();
+            const boxBase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.24, 1.5), new THREE.MeshStandardMaterial({ color: 0xfef3c7 }));
+            const boxTopStripe = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.26, 0.4), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+            pizzaBoxGroup.add(boxBase, boxTopStripe);
+            scene.add(pizzaBoxGroup);
+
+            const rockBoxMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(1.3, 0.45, 1.3),
+                new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 })
+            );
+            scene.add(rockBoxMesh);
+
+            // Prop 4: Cohete
+            const rocketGroup = new THREE.Group();
+            const rocketBody = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 1.8, 16), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+            const rocketTip = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.6, 16), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            rocketTip.position.y = 1.2;
+            rocketGroup.add(rocketBody, rocketTip);
+            scene.add(rocketGroup);
+
+            // Prop 5: Cajero Automático + Tarjeta Dorada (Ep. 6)
+            const atmGroup = new THREE.Group();
+            const atmBody = new THREE.Mesh(new THREE.BoxGeometry(1.9, 3.2, 1.3), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            atmBody.position.y = 1.6;
+            atmBody.castShadow = true;
+            const atmScreen = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 0.9, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x16a34a, emissiveIntensity: 0.5 })
+            );
+            atmScreen.position.set(0, 2.2, 0.68);
+            atmGroup.add(atmBody, atmScreen);
+            scene.add(atmGroup);
+
+            const goldCardMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.75, 0.48, 0.06),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.75, roughness: 0.2, emissive: 0xca8a04, emissiveIntensity: 0.35 })
+            );
+            scene.add(goldCardMesh);
+
+            // Prop 6: Trono del Admin (Ep. 7)
+            const adminThroneGroup = new THREE.Group();
+            const throneSeat = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 2.2), new THREE.MeshStandardMaterial({ color: 0x6b21a8 }));
+            throneSeat.position.y = 1.2;
+            throneSeat.castShadow = true;
+            const throneBack = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.4, 0.5), new THREE.MeshStandardMaterial({ color: 0x581c87 }));
+            throneBack.position.set(0, 2.9, -0.85);
+            throneBack.castShadow = true;
+            const throneCrown = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 0.6), new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7 }));
+            throneCrown.position.set(0, 4.8, -0.85);
+            adminThroneGroup.add(throneSeat, throneBack, throneCrown);
+            scene.add(adminThroneGroup);
+
+            // Prop 7: Caja Misteriosa con Tapa y Guante en Resorte (Ep. 8)
+            const mysteryBoxGroup = new THREE.Group();
+            const mBoxBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x9333ea }));
+            mBoxBody.position.y = 0.75;
+            mBoxBody.castShadow = true;
+            const mBoxLidPivot = new THREE.Group();
+            mBoxLidPivot.position.set(0, 1.5, -0.8);
+            const mBoxLid = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.24, 1.72), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            mBoxLid.position.set(0, 0.12, 0.8);
+            mBoxLidPivot.add(mBoxLid);
+
+            const springGlovePivot = new THREE.Group();
+            springGlovePivot.position.set(0, 1.4, 0);
+            const springRod = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.6, 12), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8 }));
+            springRod.position.y = 0.8;
+            const gloveFist = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.95), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+            gloveFist.position.y = 1.85;
+            springGlovePivot.add(springRod, gloveFist);
+
+            mysteryBoxGroup.add(mBoxBody, mBoxLidPivot, springGlovePivot);
+            scene.add(mysteryBoxGroup);
+
+            // Prop 8: Martillo Banhammer Gigante (Ep. 9)
+            const banhammerGroup = new THREE.Group();
+            const hammerHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.2, 12), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+            hammerHandle.position.y = 1.4;
+            const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.1), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6 }));
+            hammerHead.position.y = 2.9;
+            const hammerBand = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.25, 1.16), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            hammerBand.position.y = 2.9;
+            banhammerGroup.add(hammerHandle, hammerHead, hammerBand);
+            scene.add(banhammerGroup);
+
+            // Prop 9: Podio de Alcalde (Ep. 10)
+            const podiumGroup = new THREE.Group();
+            const podiumBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.8, 1.8), new THREE.MeshStandardMaterial({ color: 0x1d4ed8 }));
+            podiumBase.position.y = 0.9;
+            podiumBase.castShadow = true;
+            const podiumTop = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.3, 2.2), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            podiumTop.position.y = 1.9;
+            podiumGroup.add(podiumBase, podiumTop);
+            scene.add(podiumGroup);
+
+            // Rayo dorado, onda expansiva y partículas
+            const laserBeam = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.25, 0.45, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.85 })
+            );
+            laserBeam.visible = false;
+            scene.add(laserBeam);
+
+            const shockwaveRing = new THREE.Mesh(
+                new THREE.RingGeometry(0.5, 1.4, 32),
+                new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+            );
+            shockwaveRing.rotation.x = -Math.PI / 2;
+            shockwaveRing.position.y = 0.18;
+            shockwaveRing.visible = false;
+            scene.add(shockwaveRing);
+
+            const particles = [];
+            const pColors = [0xfacc15, 0xef4444, 0x38bdf8, 0xffffff];
+            for (let i = 0; i < 28; i++) {
+                const p = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.42, 0.42, 0.42),
+                    new THREE.MeshStandardMaterial({ color: pColors[i % pColors.length], emissive: pColors[i % pColors.length], emissiveIntensity: 0.4 })
+                );
+                p.visible = false;
+                scene.add(p);
+                particles.push({ mesh: p, vel: new THREE.Vector3(), rot: new THREE.Vector3() });
+            }
+
+            /**
+             * ====================================================================
+             * 5. CONTROL DE CÁMARA (CINEMÁTICA AUTOMÁTICA Y CÁMARA LIBRE)
+             * ====================================================================
+             */
+            let manualCamera = false;
+            let isDragging = false;
+            let prevPointer = { x: 0, y: 0 };
+            let orbitSpherical = { theta: 0, phi: Math.PI / 3, radius: 16 };
+            const orbitTarget = new THREE.Vector3(0, 3, 2);
+
+            const camPosGoal = new THREE.Vector3(0, 6, 15);
+            const camLookGoal = new THREE.Vector3(0, 3, 2);
+            const currentLookAt = new THREE.Vector3(0, 3, 2);
+
+            const btnCamToggle = document.getElementById('btn-cam-toggle');
+            const camModeLabel = document.getElementById('cam-mode-label');
+
+            function setManualCameraMode(enable) {
+                manualCamera = enable;
+                camModeLabel.textContent = manualCamera ? 'LIBRE' : 'CINE';
+                btnCamToggle.classList.toggle('border-amber-400', manualCamera);
+                btnCamToggle.classList.toggle('text-amber-300', manualCamera);
+                if (manualCamera) {
+                    const offset = camera.position.clone().sub(orbitTarget);
+                    orbitSpherical.radius = Math.max(5, offset.length());
+                    orbitSpherical.theta = Math.atan2(offset.x, offset.z);
+                    orbitSpherical.phi = Math.acos(THREE.MathUtils.clamp(offset.y / orbitSpherical.radius, -0.99, 0.99));
+                }
+            }
+
+            container.addEventListener('pointerdown', (e) => {
+                isDragging = true;
+                prevPointer = { x: e.clientX, y: e.clientY };
+                if (!manualCamera) setManualCameraMode(true);
+            });
+            window.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - prevPointer.x;
+                const dy = e.clientY - prevPointer.y;
+                prevPointer = { x: e.clientX, y: e.clientY };
+                orbitSpherical.theta -= dx * 0.007;
+                orbitSpherical.phi = THREE.MathUtils.clamp(orbitSpherical.phi - dy * 0.007, 0.15, Math.PI / 2 - 0.04);
+            });
+            window.addEventListener('pointerup', () => { isDragging = false; });
+            container.addEventListener('wheel', (e) => {
+                if (!manualCamera) setManualCameraMode(true);
+                orbitSpherical.radius = THREE.MathUtils.clamp(orbitSpherical.radius + e.deltaY * 0.015, 5, 55);
+            }, { passive: true });
+
+            btnCamToggle.addEventListener('click', () => setManualCameraMode(!manualCamera));
+
+            /**
+             * ====================================================================
+             * 6. 10 HISTORIAS COMPLETAS EN 3D (TEMPORADA EN ESTE PUEBLO)
+             * ====================================================================
+             */
+            function triggerImpactEffect(color = 'rgba(255,255,255,0.6)') {
+                const flash = document.getElementById('impact-flash');
+                flash.style.backgroundColor = color;
+                flash.style.opacity = '1';
+                setTimeout(() => { flash.style.opacity = '0'; }, 95);
+
+                document.body.classList.remove('shake-active');
+                void document.body.offsetWidth;
+                document.body.classList.add('shake-active');
+            }
+
+            function spawnBurst(x, y, z, speed = 16) {
+                particles.forEach(p => {
+                    p.mesh.visible = true;
+                    p.mesh.position.set(x, y, z);
+                    p.vel.set((Math.random() - 0.5) * speed, 7 + Math.random() * speed * 0.7, (Math.random() - 0.5) * speed);
+                    p.rot.set(Math.random() * 10, Math.random() * 10, Math.random() * 10);
+                });
+            }
+
+            function updateParticles(dt) {
+                particles.forEach(p => {
+                    if (!p.mesh.visible) return;
+                    p.vel.y -= 24 * dt;
+                    p.mesh.position.addScaledVector(p.vel, dt);
+                    p.mesh.rotation.x += p.rot.x * dt;
+                    p.mesh.rotation.y += p.rot.y * dt;
+                    if (p.mesh.position.y < 0.2) p.mesh.visible = false;
+                });
+            }
+
+            function animateWalk(char, time, speed = 10, amp = 0.7) {
+                const swing = Math.sin(time * speed) * amp;
+                char.leftLegPivot.rotation.x = swing;
+                char.rightLegPivot.rotation.x = -swing;
+                char.leftArmPivot.rotation.x = -swing * 0.85;
+                char.rightArmPivot.rotation.x = swing * 0.85;
+                char.root.position.y = Math.abs(Math.cos(time * speed)) * 0.2;
+            }
+
+            function resetPose(char) {
+                char.leftLegPivot.rotation.set(0, 0, 0);
+                char.rightLegPivot.rotation.set(0, 0, 0);
+                char.leftArmPivot.rotation.set(0, 0, 0);
+                char.rightArmPivot.rotation.set(0, 0, 0);
+                char.headPivot.rotation.set(0, 0, 0);
+            }
+
+            const EPISODES = [
+                {
+                    id: 1,
+                    title: 'El Robo de la Bloxy Cola Dorada',
+                    category: 'Clásico',
+                    cast: 'Happy Face · Man Face · Epic Face',
+                    duration: 23.0,
+                    subtitles: [
+                        { start: 0.0,  end: 3.2,  html: 'EN ESTE PUEBLO TODOS VIVÍAN EN <span class="text-green-400">PAZ</span>...' },
+                        { start: 3.2,  end: 6.6,  html: '<span class="text-yellow-300">HAPPY FACE</span> PRESUMÍA SU <span class="text-amber-400">BLOXY COLA DORADA</span>...' },
+                        { start: 6.6,  end: 10.0, html: 'PERO <span class="text-sky-400">MAN FACE</span> TENÍA OTROS PLANES...' },
+                        { start: 10.0, end: 13.5, html: '<span class="text-red-500">¡SE LA ROBÓ!</span>' },
+                        { start: 13.5, end: 17.0, html: 'HASTA QUE LLEGÓ <span class="text-yellow-300">EPIC FACE</span> DEL CIELO...' },
+                        { start: 17.0, end: 20.2, html: '<span class="text-amber-400">¡JUSTICIA ÉPICA!</span> <span class="text-red-500">OOF.</span>' },
+                        { start: 20.2, end: 23.0, html: 'Y EL PUEBLO VOLVIÓ A ESTAR EN <span class="text-green-400">PAZ</span>.' }
+                    ],
+                    setup() {
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(-8, 0, 2);
+                        happyChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(12, 0, -2);
+                        manChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        epicChar.root.visible = false;
+                        epicChar.root.position.set(2.2, 22, 2);
+                        bloxyColaGroup.visible = true;
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 3.2) {
+                            happyChar.root.position.x = THREE.MathUtils.lerp(-8, -3, t / 3.2);
+                            animateWalk(happyChar, t, 10, 0.7);
+                            stepFn(0.3, 1.1);
+                            bloxyColaGroup.position.set(happyChar.root.position.x + 1.1, happyChar.root.position.y + 3.1, 2.6);
+                            bloxyColaGroup.rotation.y += dt * 3;
+                            camPosGoal.set(-2, 6.5, 16);
+                            camLookGoal.set(-2, 3.2, 1);
+                        } else if (t < 6.6) {
+                            const s = t - 3.2;
+                            resetPose(happyChar);
+                            happyChar.root.position.set(-3, Math.abs(Math.sin(s * 7)) * 0.25, 2);
+                            happyChar.root.rotation.y = 0.25;
+                            happyChar.rightArmPivot.rotation.x = -2.4;
+                            bloxyColaGroup.position.set(-1.6, happyChar.root.position.y + 4.8, 2.3);
+                            bloxyColaGroup.rotation.y += dt * 5;
+                            camPosGoal.set(-2.5, 4.8, 9.5);
+                            camLookGoal.set(-2.5, 3.8, 2);
+                        } else if (t < 10.0) {
+                            const s = t - 6.6;
+                            manChar.root.position.x = THREE.MathUtils.lerp(10, 0.2, Math.min(1, s / 2.2));
+                            manChar.root.position.z = THREE.MathUtils.lerp(-2, 2, Math.min(1, s / 2.2));
+                            if (s < 2.2) {
+                                animateWalk(manChar, s, 8, 0.55);
+                                stepFn(0.38, 0.75);
+                            } else {
+                                resetPose(manChar);
+                                manChar.root.position.y = 0;
+                                once('ep1_boom', () => {
+                                    sfx.playBoom();
+                                    triggerImpactEffect('rgba(255,255,255,0.45)');
+                                });
+                            }
+                            camPosGoal.set(manChar.root.position.x - 1.2, 4.6, 6.2);
+                            camLookGoal.set(manChar.root.position.x, 4.5, 2);
+                        } else if (t < 13.5) {
+                            const s = t - 10.0;
+                            if (s < 0.7) {
+                                const p = s / 0.7;
+                                manChar.root.position.x = THREE.MathUtils.lerp(0.2, -2.0, p);
+                                manChar.rightArmPivot.rotation.x = -2.0;
+                                happyChar.root.position.x = THREE.MathUtils.lerp(-3, -5.5, p);
+                                happyChar.root.rotation.z = p * 1.3;
+                                happyChar.root.position.y = Math.sin(p * Math.PI) * 1.0;
+                                once('ep1_steal', () => {
+                                    sfx.playOof();
+                                    sfx.playBoom();
+                                    happyChar.setFace('shock');
+                                    triggerImpactEffect('rgba(239,68,68,0.5)');
+                                });
+                            } else {
+                                happyChar.root.position.set(-5.5, 0.5, 2);
+                                happyChar.root.rotation.set(0, Math.PI / 2, Math.PI / 2.1);
+                                const r = s - 0.7;
+                                manChar.root.position.x = THREE.MathUtils.lerp(-2.0, 5.5, Math.min(1, r / 2.2));
+                                manChar.root.rotation.y = Math.PI / 2;
+                                animateWalk(manChar, r, 16, 0.9);
+                                manChar.rightArmPivot.rotation.x = -2.7;
+                                stepFn(0.2, 0.85);
+                            }
+                            bloxyColaGroup.position.set(manChar.root.position.x + 1.1, manChar.root.position.y + 4.9, 2.2);
+                            bloxyColaGroup.rotation.y += dt * 5;
+                            camPosGoal.set(-0.5, 5.5, 13.5);
+                            camLookGoal.set(0, 3.2, 2);
+                        } else if (t < 17.0) {
+                            const s = t - 13.5;
+                            epicChar.root.visible = true;
+                            manChar.root.position.set(5.5, 0, 2);
+                            manChar.root.rotation.y = -Math.PI / 2;
+                            resetPose(manChar);
+
+                            if (s < 1.1) {
+                                const f = s / 1.1;
+                                epicChar.root.position.set(2.2, THREE.MathUtils.lerp(22, 0, f * f), 2);
+                                epicChar.root.rotation.y = Math.PI / 2;
+                                epicChar.leftArmPivot.rotation.z = -2.2;
+                                epicChar.rightArmPivot.rotation.z = 2.2;
+                                if (epicChar.capePivot) epicChar.capePivot.rotation.x = 1.1;
+                                once('ep1_chord', () => sfx.playEpicChord());
+                                camPosGoal.set(2.2, 6.0, 12.0);
+                                camLookGoal.set(2.2, Math.max(3.5, epicChar.root.position.y), 2);
+                            } else {
+                                epicChar.root.position.set(2.2, 0, 2);
+                                resetPose(epicChar);
+                                if (epicChar.capePivot) epicChar.capePivot.rotation.x = 0.25 + Math.sin(s * 10) * 0.15;
+                                const w = s - 1.1;
+                                shockwaveRing.visible = w < 1.5;
+                                shockwaveRing.position.set(2.2, 0.18, 2);
+                                const sc = 1 + w * 7.5;
+                                shockwaveRing.scale.set(sc, sc, 1);
+                                shockwaveRing.material.opacity = Math.max(0, 0.85 - w * 0.6);
+                                once('ep1_land', () => {
+                                    sfx.playBoom();
+                                    triggerImpactEffect('rgba(250,204,21,0.65)');
+                                });
+                                camPosGoal.set(0.2, 4.7, 6.5);
+                                camLookGoal.set(2.2, 4.5, 2);
+                            }
+                            bloxyColaGroup.position.set(manChar.root.position.x - 1.1, 3.2, 2.3);
+                        } else if (t < 20.2) {
+                            const s = t - 17.0;
+                            shockwaveRing.visible = false;
+                            epicChar.root.position.x = THREE.MathUtils.lerp(2.2, 4.6, Math.min(1, s * 3));
+                            epicChar.rightArmPivot.rotation.x = -2.4;
+                            once('ep1_hit', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                triggerImpactEffect('rgba(255,255,255,0.85)');
+                                spawnBurst(5.2, 3.8, 2, 18);
+                            });
+                            const fly = Math.min(1, s / 2.2);
+                            manChar.root.position.x = THREE.MathUtils.lerp(5.5, 24, fly);
+                            manChar.root.position.z = THREE.MathUtils.lerp(2, -14, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 10);
+                            manChar.root.rotation.x = s * 8;
+                            manChar.root.rotation.z = -s * 6;
+                            bloxyColaGroup.position.set(epicChar.root.position.x + 1.1, 4.2, 2.4);
+                            bloxyColaGroup.rotation.y += dt * 6;
+                            camPosGoal.set(4.5, 6.2, 14.5);
+                            camLookGoal.set(6.5, 4.0, 0);
+                        } else {
+                            const s = t - 20.2;
+                            happyChar.setFace('happy');
+                            happyChar.root.position.set(-1.8, Math.abs(Math.sin(s * 10)) * 0.4, 2);
+                            happyChar.root.rotation.set(0, 0.25, 0);
+                            happyChar.leftArmPivot.rotation.z = -2.5 + Math.sin(s * 12) * 0.4;
+                            happyChar.rightArmPivot.rotation.x = -1.7;
+                            happyChar.leftLegPivot.rotation.x = Math.sin(s * 10) * 0.5;
+                            happyChar.rightLegPivot.rotation.x = -Math.sin(s * 10) * 0.5;
+
+                            epicChar.root.position.set(1.8, Math.abs(Math.cos(s * 10)) * 0.45, 2);
+                            epicChar.root.rotation.set(0, -0.25, 0);
+                            epicChar.leftArmPivot.rotation.z = -2.6 - Math.cos(s * 12) * 0.4;
+                            epicChar.rightArmPivot.rotation.z = 2.6 + Math.cos(s * 12) * 0.4;
+                            epicChar.leftLegPivot.rotation.x = -Math.cos(s * 10) * 0.5;
+                            epicChar.rightLegPivot.rotation.x = Math.cos(s * 10) * 0.5;
+                            if (epicChar.capePivot) epicChar.capePivot.rotation.x = 0.35 + Math.sin(s * 12) * 0.2;
+
+                            bloxyColaGroup.position.set(happyChar.root.position.x + 1.1, happyChar.root.position.y + 3.2, 2.6);
+                            bloxyColaGroup.rotation.y += dt * 4;
+                            camPosGoal.set(0, 5.0, 11.5);
+                            camLookGoal.set(0, 3.2, 2);
+                        }
+                    }
+                },
+                {
+                    id: 2,
+                    title: 'El Juicio de la Espada Linked Sword',
+                    category: 'Duelo',
+                    cast: 'Man Face · Chill Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 3.8,  html: 'EN ESTE PUEBLO <span class="text-sky-400">MAN FACE</span> ENCONTRÓ LA <span class="text-amber-400">LINKED SWORD</span>...' },
+                        { start: 3.8,  end: 7.5,  html: 'Y DECIDIÓ RETAR AL TRANQUILO <span class="text-teal-300">CHILL FACE</span>.' },
+                        { start: 7.5,  end: 11.2, html: '<span class="text-teal-300">CHILL FACE</span> NI SIQUIERA SE INMUTÓ...' },
+                        { start: 11.2, end: 15.2, html: 'AL ATACAR... ¡LA ESPADA LO MANDÓ A <span class="text-red-500">VOLAR</span>! <span class="text-red-500">OOF.</span>' },
+                        { start: 15.2, end: 21.0, html: '<span class="text-yellow-300">EPIC FACE</span> Y <span class="text-teal-300">CHILL FACE</span> NO LO PODÍAN CREER.' }
+                    ],
+                    setup() {
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(-4, 0, 2);
+                        manChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        chillChar.root.visible = true;
+                        chillChar.setFace('chill');
+                        chillChar.root.position.set(4, 0, 2);
+                        chillChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(0, 0, -3.5);
+                        linkedSwordGroup.visible = true;
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 3.8) {
+                            manChar.rightArmPivot.rotation.x = -2.2 + Math.sin(t * 6) * 0.25;
+                            linkedSwordGroup.position.set(-2.5, 4.5, 2.3);
+                            linkedSwordGroup.rotation.set(0.3, t * 4, 0);
+                            once('ep2_sword1', () => sfx.playSwordSlash());
+                            camPosGoal.set(-4, 5.2, 8.5);
+                            camLookGoal.set(-3.5, 4.2, 2);
+                        } else if (t < 7.5) {
+                            const s = t - 3.8;
+                            manChar.root.position.x = THREE.MathUtils.lerp(-4, 0.5, Math.min(1, s / 2.2));
+                            if (s < 2.2) {
+                                animateWalk(manChar, s, 9, 0.6);
+                                stepFn(0.32, 0.8);
+                            } else {
+                                resetPose(manChar);
+                                manChar.root.position.y = 0;
+                            }
+                            manChar.rightArmPivot.rotation.x = -1.6;
+                            linkedSwordGroup.position.set(manChar.root.position.x + 1.8, 3.6, 2.4);
+                            linkedSwordGroup.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
+                            camPosGoal.set(0, 5.5, 13.5);
+                            camLookGoal.set(1.5, 3.5, 2);
+                        } else if (t < 11.2) {
+                            chillChar.headPivot.rotation.z = Math.sin(t * 2) * 0.08;
+                            once('ep2_chill_boom', () => {
+                                sfx.playBoom();
+                                triggerImpactEffect('rgba(45,212,191,0.35)');
+                            });
+                            camPosGoal.set(1.2, 4.7, 5.8);
+                            camLookGoal.set(4, 4.5, 2);
+                        } else if (t < 15.2) {
+                            const s = t - 11.2;
+                            once('ep2_fail', () => {
+                                sfx.playSwordSlash();
+                                sfx.playOof();
+                                sfx.playBoom();
+                                triggerImpactEffect('rgba(255,255,255,0.85)');
+                                spawnBurst(1.5, 3.8, 2, 20);
+                            });
+                            chillChar.root.position.y = -0.35;
+                            const fly = Math.min(1, s / 2.8);
+                            manChar.root.position.x = THREE.MathUtils.lerp(0.5, -18, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 14);
+                            manChar.root.position.z = THREE.MathUtils.lerp(2, -12, fly);
+                            manChar.root.rotation.x = s * 11;
+                            manChar.root.rotation.z = s * 9;
+
+                            linkedSwordGroup.position.set(2.2, 0.35, 3.5);
+                            linkedSwordGroup.rotation.set(Math.PI / 2, 0.4, 0.8);
+                            camPosGoal.set(-2, 7.5, 16);
+                            camLookGoal.set(-2, 4.5, 0);
+                        } else {
+                            const s = t - 15.2;
+                            chillChar.root.position.y = 0;
+                            chillChar.root.rotation.y = 0;
+                            epicChar.root.position.set(-1.5, Math.abs(Math.sin(s * 8)) * 0.3, 1.5);
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+                            camPosGoal.set(1.2, 5.2, 11.0);
+                            camLookGoal.set(1.2, 3.5, 1.8);
+                        }
+                    }
+                },
+                {
+                    id: 3,
+                    title: 'La Invasión del Noob Gigante',
+                    category: 'Clásico',
+                    cast: 'Winning Smile Gigante · Man Face · Epic Face',
+                    duration: 23.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: 'UN DÍA EN ESTE PUEBLO LA TIERRA EMPEZÓ A <span class="text-red-500">TEMBLAR</span>...' },
+                        { start: 4.0,  end: 8.2,  html: '¡ERA UN <span class="text-yellow-300">NOOB GIGANTE</span> CON WINNING SMILE!' },
+                        { start: 8.2,  end: 12.2, html: '<span class="text-sky-400">MAN FACE</span> QUISO HACERSE EL VALIENTE... Y <span class="text-red-500">HUYÓ</span>.' },
+                        { start: 12.2, end: 17.0, html: '<span class="text-yellow-300">EPIC FACE</span> ACTIVÓ SU <span class="text-amber-400">RAYO ENCOGEDOR</span>...' },
+                        { start: 17.0, end: 23.0, html: '¡Y LO CONVIRTIÓ EN UN <span class="text-green-400">MINI NOOB</span> DE BOLSILLO!' }
+                    ],
+                    setup() {
+                        giantChar.root.visible = true;
+                        giantChar.setFace('winning');
+                        giantChar.root.scale.set(3.4, 3.4, 3.4);
+                        giantChar.root.position.set(0, 0, -14);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(-2.5, 0, 4);
+                        manChar.root.rotation.set(0, Math.PI, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(3.5, 0, 4);
+                        epicChar.root.rotation.set(0, Math.PI, 0);
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 4.0) {
+                            giantChar.root.position.z = THREE.MathUtils.lerp(-18, -7, t / 4.0);
+                            animateWalk(giantChar, t, 5, 0.45);
+                            if (Math.sin(t * 5) > 0.96) {
+                                once('ep3_step_' + Math.floor(t), () => {
+                                    sfx.playBoom();
+                                    triggerImpactEffect('rgba(255,255,255,0.35)');
+                                });
+                            }
+                            camPosGoal.set(0, 8, 18);
+                            camLookGoal.set(0, 7, -6);
+                        } else if (t < 8.2) {
+                            resetPose(giantChar);
+                            giantChar.root.position.y = 0;
+                            giantChar.leftArmPivot.rotation.z = -2.4;
+                            giantChar.rightArmPivot.rotation.z = 2.4;
+                            once('ep3_roar', () => {
+                                sfx.playBoom();
+                                triggerImpactEffect('rgba(250,204,21,0.5)');
+                            });
+                            camPosGoal.set(0, 11, 13);
+                            camLookGoal.set(0, 14, -7);
+                        } else if (t < 12.2) {
+                            const s = t - 8.2;
+                            if (s < 1.2) {
+                                manChar.root.rotation.y = Math.PI;
+                                manChar.rightArmPivot.rotation.x = -2.0;
+                            } else {
+                                manChar.setFace('shock');
+                                manChar.root.rotation.y = -Math.PI / 2;
+                                manChar.root.position.x = THREE.MathUtils.lerp(-2.5, -24, (s - 1.2) / 2.8);
+                                animateWalk(manChar, s, 20, 1.0);
+                                stepFn(0.16, 1.2);
+                                once('ep3_run', () => sfx.playOof());
+                            }
+                            camPosGoal.set(-3, 5.5, 13);
+                            camLookGoal.set(-3, 3.5, 3);
+                        } else if (t < 17.0) {
+                            const s = t - 12.2;
+                            epicChar.root.position.set(0, 1.2 + Math.sin(s * 6) * 0.25, 3);
+                            epicChar.root.rotation.y = Math.PI;
+                            epicChar.leftArmPivot.rotation.x = -1.6;
+                            epicChar.rightArmPivot.rotation.x = -1.6;
+
+                            laserBeam.visible = true;
+                            laserBeam.position.set(0, 5.5, -2);
+                            laserBeam.rotation.set(Math.PI / 2.3, 0, 0);
+                            laserBeam.scale.set(1 + Math.sin(s * 25) * 0.25, 1, 1 + Math.sin(s * 25) * 0.25);
+
+                            const shrink = THREE.MathUtils.lerp(3.4, 0.45, Math.min(1, s / 4.2));
+                            giantChar.root.scale.set(shrink, shrink, shrink);
+                            giantChar.root.rotation.y = s * 10;
+
+                            once('ep3_laser', () => {
+                                sfx.playLaser();
+                                sfx.playEpicChord();
+                                triggerImpactEffect('rgba(250,204,21,0.7)');
+                            });
+                            camPosGoal.set(7.5, 6.5, 9);
+                            camLookGoal.set(0, 4.5, -3);
+                        } else {
+                            const s = t - 17.0;
+                            laserBeam.visible = false;
+                            giantChar.root.scale.set(0.45, 0.45, 0.45);
+                            giantChar.root.position.set(0, 0, 1);
+                            giantChar.root.rotation.y = s * 4;
+                            animateWalk(giantChar, s, 14, 0.6);
+
+                            epicChar.root.position.set(2.2, Math.abs(Math.sin(s * 9)) * 0.35, 2.5);
+                            epicChar.root.rotation.y = -0.3;
+                            epicChar.leftArmPivot.rotation.z = -2.5;
+                            epicChar.rightArmPivot.rotation.z = 2.5;
+                            camPosGoal.set(1, 4.2, 9.5);
+                            camLookGoal.set(0.8, 2.2, 1.5);
+                        }
+                    }
+                },
+                {
+                    id: 4,
+                    title: 'La Pizza de Builder Brothers',
+                    category: 'Comedia',
+                    cast: 'Happy Face · Chill Face · Man Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: '<span class="text-yellow-300">HAPPY FACE</span> Y <span class="text-teal-300">CHILL FACE</span> PIDIERON UNA <span class="text-amber-400">PIZZA LEGENDARIA</span>...' },
+                        { start: 4.0,  end: 8.2,  html: '<span class="text-sky-400">MAN FACE</span> QUISO CAMBIARLA POR UNA <span class="text-slate-300">PIEDRA</span>...' },
+                        { start: 8.2,  end: 12.5, html: 'PERO <span class="text-yellow-300">EPIC FACE</span> VIO TODO Y ACTIVÓ SU <span class="text-amber-400">SUPERVELOCIDAD</span>...' },
+                        { start: 12.5, end: 17.0, html: '<span class="text-sky-400">MAN FACE</span> MORDIÓ EL BLOQUE DE HORMIGÓN... <span class="text-red-500">OOF.</span>' },
+                        { start: 17.0, end: 21.0, html: 'Y LOS TRES DISFRUTARON LA <span class="text-amber-400">PIZZA</span> EN LA PLAZA.' }
+                    ],
+                    setup() {
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(-2.2, 0, 2);
+                        happyChar.root.rotation.set(0, 0.4, 0);
+
+                        chillChar.root.visible = true;
+                        chillChar.setFace('chill');
+                        chillChar.root.position.set(2.2, 0, 2);
+                        chillChar.root.rotation.set(0, -0.4, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(9, 0, -2);
+                        manChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        epicChar.root.visible = false;
+                        epicChar.setFace('epic');
+
+                        pizzaBoxGroup.visible = true;
+                        pizzaBoxGroup.position.set(0, 0.25, 3.2);
+                        rockBoxMesh.visible = true;
+                        rockBoxMesh.position.set(9, 2.5, -2);
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 4.0) {
+                            happyChar.root.position.y = Math.abs(Math.sin(t * 7)) * 0.25;
+                            chillChar.headPivot.rotation.z = Math.sin(t * 4) * 0.12;
+                            pizzaBoxGroup.rotation.y += dt * 1.5;
+                            camPosGoal.set(0, 5.2, 11.5);
+                            camLookGoal.set(0, 2.5, 2.5);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            manChar.root.position.x = THREE.MathUtils.lerp(9, 0, Math.min(1, s / 2.5));
+                            manChar.root.position.z = THREE.MathUtils.lerp(-2, 3.8, Math.min(1, s / 2.5));
+                            if (s < 2.5) {
+                                animateWalk(manChar, s, 9, 0.6);
+                                stepFn(0.32, 0.8);
+                                rockBoxMesh.position.set(manChar.root.position.x - 1, 2.6, manChar.root.position.z);
+                            } else {
+                                resetPose(manChar);
+                                manChar.root.position.y = 0;
+                                rockBoxMesh.position.set(0, 0.25, 3.2);
+                                pizzaBoxGroup.position.set(0, 2.8, 4.4);
+                            }
+                            camPosGoal.set(2.5, 5.0, 10.5);
+                            camLookGoal.set(0, 2.8, 3.2);
+                        } else if (t < 12.5) {
+                            const s = t - 8.2;
+                            epicChar.root.visible = true;
+                            epicChar.root.position.x = THREE.MathUtils.lerp(-14, 14, Math.min(1, s / 1.4));
+                            epicChar.root.position.z = 3.8;
+                            epicChar.root.rotation.y = Math.PI / 2;
+                            if (epicChar.capePivot) epicChar.capePivot.rotation.x = 1.2;
+
+                            once('ep4_swap', () => {
+                                sfx.playLaser();
+                                triggerImpactEffect('rgba(250,204,21,0.55)');
+                            });
+                            if (s > 0.7) {
+                                pizzaBoxGroup.position.set(0, 0.25, 3.2);
+                                rockBoxMesh.position.set(0, 2.8, 4.4);
+                            }
+                            camPosGoal.set(0, 5.5, 12.0);
+                            camLookGoal.set(0, 3.0, 3.5);
+                        } else if (t < 17.0) {
+                            const s = t - 12.5;
+                            epicChar.root.visible = false;
+                            once('ep4_bite', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(239,68,68,0.6)');
+                                spawnBurst(0, 3.5, 4.2, 16);
+                            });
+                            const fly = Math.min(1, s / 2.5);
+                            manChar.root.position.z = THREE.MathUtils.lerp(3.8, 16, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 5);
+                            manChar.root.rotation.x = -s * 7;
+                            rockBoxMesh.position.set(0, 0.25, 5.5);
+                            camPosGoal.set(-3.5, 4.8, 11.5);
+                            camLookGoal.set(0, 3.2, 5.5);
+                        } else {
+                            const s = t - 17.0;
+                            epicChar.root.visible = true;
+                            epicChar.root.position.set(0, Math.abs(Math.sin(s * 9)) * 0.35, 1.4);
+                            epicChar.root.rotation.y = 0;
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+
+                            happyChar.root.position.y = Math.abs(Math.cos(s * 9)) * 0.3;
+                            chillChar.root.position.y = Math.abs(Math.sin(s * 9)) * 0.3;
+                            pizzaBoxGroup.position.set(0, 0.25, 3.2);
+                            pizzaBoxGroup.rotation.y += dt * 3;
+                            camPosGoal.set(0, 5.0, 11.0);
+                            camLookGoal.set(0, 2.8, 2.2);
+                        }
+                    }
+                },
+                {
+                    id: 5,
+                    title: 'La Carrera Clandestina en el Pueblo',
+                    category: 'Comedia',
+                    cast: 'Man Face · Happy Face · Epic Face',
+                    duration: 22.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: '<span class="text-sky-400">MAN FACE</span> RETÓ A <span class="text-yellow-300">HAPPY FACE</span> A UNA CARRERA...' },
+                        { start: 4.0,  end: 8.2,  html: 'PERO <span class="text-sky-400">MAN FACE</span> HIZO TRAMPA CON UN <span class="text-red-500">COHETE PROPULSOR</span>...' },
+                        { start: 8.2,  end: 13.0, html: '¡EL COHETE SE DESCONTROLÓ Y <span class="text-red-500">EXPLOTÓ</span>! <span class="text-red-500">OOF.</span>' },
+                        { start: 13.0, end: 17.5, html: 'MIENTRAS TANTO, <span class="text-yellow-300">EPIC FACE</span> CAMINABA EN <span class="text-amber-400">CÁMARA LENTA</span>...' },
+                        { start: 17.5, end: 22.0, html: '¡Y GANÓ LA CARRERA SIN SUDAR NI UNA GOTA!' }
+                    ],
+                    setup() {
+                        finishLine.visible = true;
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(-10, 0, 2);
+                        happyChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(-10, 0, 5.5);
+                        manChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(-10, 0, 8.8);
+                        epicChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        rocketGroup.visible = true;
+                        rocketGroup.rotation.set(0, 0, -Math.PI / 2);
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 4.0) {
+                            rocketGroup.position.set(manChar.root.position.x - 0.8, 3.0, 5.5);
+                            camPosGoal.set(-13, 5.2, 12.5);
+                            camLookGoal.set(-8, 3.2, 5.2);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            once('ep5_start', () => sfx.playBoom());
+                            happyChar.root.position.x = THREE.MathUtils.lerp(-10, 1.5, s / 4.2);
+                            animateWalk(happyChar, s, 14, 0.85);
+                            stepFn(0.22, 1.1);
+
+                            epicChar.root.position.x = THREE.MathUtils.lerp(-10, 1.0, s / 4.2);
+                            animateWalk(epicChar, s, 5, 0.4);
+
+                            manChar.root.position.x = THREE.MathUtils.lerp(-10, 6.5, Math.min(1, s / 2.2));
+                            manChar.root.position.y = 0.6 + Math.sin(s * 20) * 0.25;
+                            manChar.root.rotation.z = -0.35;
+                            rocketGroup.position.set(manChar.root.position.x - 0.8, manChar.root.position.y + 3.0, 5.5);
+                            camPosGoal.set(-1, 6.5, 16.5);
+                            camLookGoal.set(0, 3.5, 5.2);
+                        } else if (t < 13.0) {
+                            const s = t - 8.2;
+                            once('ep5_explode', () => {
+                                sfx.playBoom();
+                                sfx.playOof();
+                                manChar.setFace('shock');
+                                rocketGroup.visible = false;
+                                triggerImpactEffect('rgba(239,68,68,0.8)');
+                                spawnBurst(6.5, 3.5, 5.5, 22);
+                            });
+                            const fly = Math.min(1, s / 3.5);
+                            manChar.root.position.x = THREE.MathUtils.lerp(6.5, -14, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 14);
+                            manChar.root.rotation.x = s * 10;
+                            manChar.root.rotation.z = s * 8;
+
+                            happyChar.root.position.x = THREE.MathUtils.lerp(1.5, 7.5, s / 4.8);
+                            animateWalk(happyChar, s, 14, 0.85);
+
+                            epicChar.root.position.x = THREE.MathUtils.lerp(1.0, 9.2, s / 4.8);
+                            animateWalk(epicChar, s, 5, 0.45);
+                            camPosGoal.set(4, 6.8, 15.5);
+                            camLookGoal.set(5, 3.5, 5.5);
+                        } else if (t < 17.5) {
+                            const s = t - 13.0;
+                            epicChar.root.position.x = THREE.MathUtils.lerp(9.2, 12.2, Math.min(1, s / 2.2));
+                            animateWalk(epicChar, s, 4, 0.4);
+                            if (epicChar.capePivot) epicChar.capePivot.rotation.x = 0.65;
+
+                            happyChar.root.position.x = THREE.MathUtils.lerp(7.5, 10.2, Math.min(1, s / 2.5));
+                            resetPose(happyChar);
+                            happyChar.root.position.y = 0;
+
+                            once('ep5_win', () => {
+                                sfx.playEpicChord();
+                                triggerImpactEffect('rgba(250,204,21,0.55)');
+                            });
+                            camPosGoal.set(15.5, 4.8, 11.5);
+                            camLookGoal.set(11.5, 3.6, 6.5);
+                        } else {
+                            const s = t - 17.5;
+                            epicChar.root.position.set(12.2, Math.abs(Math.sin(s * 9)) * 0.4, 7.2);
+                            epicChar.root.rotation.y = -0.35;
+                            epicChar.leftArmPivot.rotation.z = -2.5;
+                            epicChar.rightArmPivot.rotation.z = 2.5;
+
+                            happyChar.root.position.set(11.8, Math.abs(Math.cos(s * 9)) * 0.35, 3.2);
+                            happyChar.root.rotation.y = -0.25;
+                            happyChar.leftArmPivot.rotation.z = -2.4;
+                            happyChar.rightArmPivot.rotation.z = 2.4;
+                            camPosGoal.set(14.5, 5.2, 12.0);
+                            camLookGoal.set(11.8, 3.4, 5.2);
+                        }
+                    }
+                },
+                {
+                    id: 6,
+                    title: 'El Cajero Automático Maldito',
+                    category: 'Misterio',
+                    cast: 'Man Face · Happy Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: 'EN LA PLAZA APARECIÓ UN <span class="text-green-400">CAJERO DORADO</span> MISTERIOSO...' },
+                        { start: 4.0,  end: 8.2,  html: '<span class="text-sky-400">MAN FACE</span> INTENTÓ HACKEARLO CON UNA TARJETA FALSA...' },
+                        { start: 8.2,  end: 12.5, html: '¡EL CAJERO CHISPEÓ Y LO MANDÓ A <span class="text-red-500">VOLAR</span>! <span class="text-red-500">OOF.</span>' },
+                        { start: 12.5, end: 17.0, html: '<span class="text-yellow-300">EPIC FACE</span> PASÓ SU <span class="text-amber-400">TARJETA MAESTRA</span>...' },
+                        { start: 17.0, end: 21.0, html: 'Y REPARTIÓ BLOXY COLAS DORADAS A TODO EL PUEBLO.' }
+                    ],
+                    setup() {
+                        atmGroup.visible = true;
+                        atmGroup.position.set(0, 0, 1.5);
+                        atmScreen.material.color.setHex(0x22c55e);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(2.2, 0, 2.2);
+                        manChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(-4.5, 0, 3.5);
+                        happyChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(-7.5, 0, 1.5);
+                        epicChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        goldCardMesh.visible = true;
+                    },
+                    update(t, dt, once) {
+                        if (t < 4.0) {
+                            goldCardMesh.position.set(2.2, 2.5 + Math.sin(t * 5) * 0.15, 2.5);
+                            goldCardMesh.rotation.set(0, Math.PI / 2, 0.2);
+                            camPosGoal.set(0, 4.8, 10.5);
+                            camLookGoal.set(0, 2.8, 2.0);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            manChar.rightArmPivot.rotation.x = -1.7 + Math.sin(s * 12) * 0.2;
+                            goldCardMesh.position.set(1.1, 2.2, 2.2);
+                            atmScreen.material.color.setHex(Math.sin(s * 20) > 0 ? 0xef4444 : 0xfacc15);
+                            once('ep6_alarm', () => sfx.playLaser());
+                            camPosGoal.set(2.8, 4.3, 7.2);
+                            camLookGoal.set(0.8, 2.4, 2.0);
+                        } else if (t < 12.5) {
+                            const s = t - 8.2;
+                            once('ep6_boom', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(239,68,68,0.75)');
+                                spawnBurst(0.5, 2.5, 2.2, 18);
+                            });
+                            const fly = Math.min(1, s / 2.6);
+                            manChar.root.position.x = THREE.MathUtils.lerp(2.2, 18, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 10);
+                            manChar.root.rotation.z = -s * 9;
+                            camPosGoal.set(1.5, 5.8, 13.5);
+                            camLookGoal.set(4.0, 3.5, 2.0);
+                        } else if (t < 17.0) {
+                            const s = t - 12.5;
+                            epicChar.root.position.x = THREE.MathUtils.lerp(-7.5, -1.5, Math.min(1, s / 2.0));
+                            atmScreen.material.color.setHex(0x38bdf8);
+                            goldCardMesh.position.set(-0.8, 2.3, 2.2);
+                            once('ep6_epic', () => sfx.playEpicChord());
+                            camPosGoal.set(-1.5, 4.6, 8.5);
+                            camLookGoal.set(-0.5, 2.6, 2.0);
+                        } else {
+                            const s = t - 17.0;
+                            bloxyColaGroup.visible = true;
+                            bloxyColaGroup.position.set(-3.2, 3.6 + Math.abs(Math.sin(s * 8)) * 0.3, 3.5);
+                            bloxyColaGroup.rotation.y += dt * 4;
+                            happyChar.root.position.y = Math.abs(Math.sin(s * 9)) * 0.35;
+                            epicChar.root.position.y = Math.abs(Math.cos(s * 9)) * 0.35;
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+                            camPosGoal.set(-1.0, 5.0, 11.0);
+                            camLookGoal.set(-1.5, 3.0, 2.5);
+                        }
+                    }
+                },
+                {
+                    id: 7,
+                    title: 'El Trono del Admin Supuesto',
+                    category: 'Poder',
+                    cast: 'Chill Face · Man Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: 'EN EL CENTRO DEL PUEBLO APARECIÓ EL <span class="text-purple-400">TRONO DEL ADMIN</span>...' },
+                        { start: 4.0,  end: 8.2,  html: '<span class="text-teal-300">CHILL FACE</span> SE SENTÓ MUY RELAJADO SIN HACER NADA...' },
+                        { start: 8.2,  end: 12.5, html: '<span class="text-sky-400">MAN FACE</span> RECLAMÓ EL TRONO... ¡Y <span class="text-red-500">RESBALÓ</span>! <span class="text-red-500">OOF.</span>' },
+                        { start: 12.5, end: 17.0, html: '<span class="text-yellow-300">EPIC FACE</span> DESCENDIÓ CON EL <span class="text-amber-400">PODER VERDADERO</span>...' },
+                        { start: 17.0, end: 21.0, html: 'Y COMPARTIÓ EL TRONO CON TODO EL PUEBLO.' }
+                    ],
+                    setup() {
+                        adminThroneGroup.visible = true;
+                        adminThroneGroup.position.set(0, 0, 1.0);
+
+                        chillChar.root.visible = true;
+                        chillChar.setFace('chill');
+                        chillChar.root.position.set(-4.5, 0, 3.5);
+                        chillChar.root.rotation.set(0, 0.5, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(4.5, 0, 3.5);
+                        manChar.root.rotation.set(0, -0.5, 0);
+
+                        epicChar.root.visible = false;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(0, 18, 1.0);
+                    },
+                    update(t, dt, once, stepFn) {
+                        if (t < 4.0) {
+                            camPosGoal.set(0, 5.2, 11.5);
+                            camLookGoal.set(0, 3.0, 1.5);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            chillChar.root.position.x = THREE.MathUtils.lerp(-4.5, 0, Math.min(1, s / 2.2));
+                            chillChar.root.position.z = THREE.MathUtils.lerp(3.5, 1.1, Math.min(1, s / 2.2));
+                            if (s < 2.2) {
+                                animateWalk(chillChar, s, 8, 0.5);
+                                stepFn(0.35, 0.9);
+                            } else {
+                                resetPose(chillChar);
+                                chillChar.root.position.set(0, 1.5, 1.1);
+                                chillChar.root.rotation.y = 0;
+                                chillChar.leftLegPivot.rotation.x = -1.4;
+                                chillChar.rightLegPivot.rotation.x = -1.4;
+                            }
+                            camPosGoal.set(0, 4.8, 8.5);
+                            camLookGoal.set(0, 3.2, 1.2);
+                        } else if (t < 12.5) {
+                            const s = t - 8.2;
+                            once('ep7_slip', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(168,85,247,0.55)');
+                                spawnBurst(1.5, 2.2, 2.0, 15);
+                            });
+                            const fly = Math.min(1, s / 2.4);
+                            manChar.root.position.x = THREE.MathUtils.lerp(4.5, 16, fly);
+                            manChar.root.position.y = Math.max(0.4, Math.sin(fly * Math.PI) * 7);
+                            manChar.root.rotation.z = -s * 8;
+                            camPosGoal.set(2.0, 5.2, 12.0);
+                            camLookGoal.set(3.0, 3.0, 2.0);
+                        } else if (t < 17.0) {
+                            const s = t - 12.5;
+                            epicChar.root.visible = true;
+                            chillChar.root.position.set(-3.2, 0, 3.0);
+                            chillChar.root.rotation.y = 0.4;
+                            resetPose(chillChar);
+
+                            const fall = Math.min(1, s / 1.2);
+                            epicChar.root.position.set(0, THREE.MathUtils.lerp(18, 1.5, fall * fall), 1.1);
+                            epicChar.leftLegPivot.rotation.x = -1.4;
+                            epicChar.rightLegPivot.rotation.x = -1.4;
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+
+                            once('ep7_epic', () => {
+                                sfx.playEpicChord();
+                                sfx.playBoom();
+                                triggerImpactEffect('rgba(250,204,21,0.65)');
+                            });
+                            camPosGoal.set(0, 5.2, 9.5);
+                            camLookGoal.set(0, 3.4, 1.2);
+                        } else {
+                            const s = t - 17.0;
+                            epicChar.root.position.y = 1.5 + Math.abs(Math.sin(s * 8)) * 0.25;
+                            chillChar.root.position.y = Math.abs(Math.cos(s * 8)) * 0.25;
+                            camPosGoal.set(0, 5.0, 11.0);
+                            camLookGoal.set(0, 3.0, 1.8);
+                        }
+                    }
+                },
+                {
+                    id: 8,
+                    title: 'La Entrega de la Caja Misteriosa',
+                    category: 'Misterio',
+                    cast: 'Happy Face · Man Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: '<span class="text-yellow-300">HAPPY FACE</span> DEJÓ UNA <span class="text-purple-400">CAJA MISTERIOSA</span> CON ADVERTENCIA...' },
+                        { start: 4.0,  end: 8.2,  html: '<span class="text-sky-400">MAN FACE</span> NO HIZO CASO Y LA ABRIÓ A ESCONDIDAS...' },
+                        { start: 8.2,  end: 12.5, html: '¡UN <span class="text-red-500">GUANTE EN RESORTE</span> SALIÓ DISPARADO! <span class="text-red-500">OOF.</span>' },
+                        { start: 12.5, end: 17.0, html: '<span class="text-yellow-300">EPIC FACE</span> ABRIÓ LA CAJA CON ESTILO...' },
+                        { start: 17.0, end: 21.0, html: 'Y DE AHÍ SALIERON BLOXY COLAS DORADAS PARA TODOS.' }
+                    ],
+                    setup() {
+                        mysteryBoxGroup.visible = true;
+                        mysteryBoxGroup.position.set(0, 0, 2.0);
+                        mBoxLidPivot.rotation.x = 0;
+                        springGlovePivot.scale.set(1, 0.1, 1);
+
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(-4.5, 0, 2.5);
+                        happyChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(3.2, 0, 2.5);
+                        manChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        epicChar.root.visible = false;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(0, 0, 5.5);
+                    },
+                    update(t, dt, once) {
+                        if (t < 4.0) {
+                            happyChar.rightArmPivot.rotation.x = -1.6 + Math.sin(t * 5) * 0.2;
+                            camPosGoal.set(-2, 4.8, 10.5);
+                            camLookGoal.set(0, 2.5, 2.2);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            manChar.root.position.x = THREE.MathUtils.lerp(3.2, 1.5, Math.min(1, s / 1.5));
+                            manChar.rightArmPivot.rotation.x = -1.8;
+                            if (s > 1.5) {
+                                mBoxLidPivot.rotation.x = THREE.MathUtils.lerp(0, -1.6, Math.min(1, (s - 1.5) / 0.8));
+                            }
+                            camPosGoal.set(1.5, 4.6, 8.2);
+                            camLookGoal.set(0.5, 2.5, 2.0);
+                        } else if (t < 12.5) {
+                            const s = t - 8.2;
+                            mBoxLidPivot.rotation.x = -1.6;
+                            springGlovePivot.scale.set(1, Math.min(2.2, 0.1 + s * 8), 1);
+                            once('ep8_spring', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(239,68,68,0.75)');
+                                spawnBurst(0.8, 3.0, 2.0, 18);
+                            });
+                            const fly = Math.min(1, s / 2.5);
+                            manChar.root.position.x = THREE.MathUtils.lerp(1.5, 18, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 11);
+                            manChar.root.rotation.z = -s * 10;
+                            camPosGoal.set(1.0, 5.8, 13.0);
+                            camLookGoal.set(3.5, 3.5, 2.0);
+                        } else if (t < 17.0) {
+                            const s = t - 12.5;
+                            epicChar.root.visible = true;
+                            springGlovePivot.scale.set(1, 0.3, 1);
+                            epicChar.root.position.set(0, Math.abs(Math.sin(s * 8)) * 0.35, 5.2);
+                            epicChar.root.rotation.y = Math.PI;
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+                            once('ep8_epic', () => {
+                                sfx.playEpicChord();
+                                triggerImpactEffect('rgba(250,204,21,0.6)');
+                            });
+                            camPosGoal.set(0, 5.0, 11.5);
+                            camLookGoal.set(0, 2.8, 3.0);
+                        } else {
+                            const s = t - 17.0;
+                            bloxyColaGroup.visible = true;
+                            bloxyColaGroup.position.set(0, 3.2 + Math.abs(Math.sin(s * 9)) * 0.4, 2.0);
+                            bloxyColaGroup.rotation.y += dt * 5;
+                            happyChar.root.position.y = Math.abs(Math.sin(s * 9)) * 0.3;
+                            epicChar.root.position.y = Math.abs(Math.cos(s * 9)) * 0.3;
+                            camPosGoal.set(0, 5.0, 11.0);
+                            camLookGoal.set(0, 3.0, 2.5);
+                        }
+                    }
+                },
+                {
+                    id: 9,
+                    title: 'El Duelo del Martillo Banhammer',
+                    category: 'Duelo',
+                    cast: 'Man Face · Chill Face · Epic Face',
+                    duration: 21.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.0,  html: '<span class="text-sky-400">MAN FACE</span> LEVANTÓ EL <span class="text-amber-400">BANHAMMER GIGANTE</span>...' },
+                        { start: 4.0,  end: 8.2,  html: 'PERO PESABA DEMASIADO Y SE FUE DE <span class="text-red-500">BOCA</span>...' },
+                        { start: 8.2,  end: 12.5, html: '¡EL MARTILLO REBOTÓ Y LO MANDÓ A <span class="text-red-500">VOLAR</span>! <span class="text-red-500">OOF.</span>' },
+                        { start: 12.5, end: 17.0, html: '<span class="text-yellow-300">EPIC FACE</span> LO LEVANTÓ CON UNA SOLA <span class="text-amber-400">MANO</span>...' },
+                        { start: 17.0, end: 21.0, html: 'Y <span class="text-teal-300">CHILL FACE</span> APROBÓ LA VICTORIA.' }
+                    ],
+                    setup() {
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(-2.0, 0, 2.0);
+                        manChar.root.rotation.set(0, Math.PI / 2, 0);
+
+                        chillChar.root.visible = true;
+                        chillChar.setFace('chill');
+                        chillChar.root.position.set(5.5, 0, 2.0);
+                        chillChar.root.rotation.set(0, -Math.PI / 2, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(0, 0, -3.5);
+
+                        banhammerGroup.visible = true;
+                        banhammerGroup.position.set(-0.5, 1.5, 2.3);
+                    },
+                    update(t, dt, once) {
+                        if (t < 4.0) {
+                            manChar.leftArmPivot.rotation.x = -2.5;
+                            manChar.rightArmPivot.rotation.x = -2.5;
+                            banhammerGroup.position.set(-0.6, 3.6 + Math.sin(t * 6) * 0.15, 2.3);
+                            banhammerGroup.rotation.z = -0.35;
+                            camPosGoal.set(-2.5, 5.2, 9.5);
+                            camLookGoal.set(-1.0, 3.8, 2.0);
+                        } else if (t < 8.2) {
+                            const s = t - 4.0;
+                            const tilt = Math.min(1.4, s * 0.7);
+                            manChar.root.rotation.z = -tilt;
+                            manChar.root.position.y = Math.sin(tilt) * 0.6;
+                            banhammerGroup.position.set(0.8, 1.6, 2.3);
+                            banhammerGroup.rotation.z = -1.4;
+                            camPosGoal.set(-1.0, 4.8, 9.5);
+                            camLookGoal.set(0, 2.8, 2.0);
+                        } else if (t < 12.5) {
+                            const s = t - 8.2;
+                            once('ep9_bounce', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(255,255,255,0.85)');
+                                spawnBurst(1.0, 3.0, 2.2, 20);
+                            });
+                            const fly = Math.min(1, s / 2.6);
+                            manChar.root.position.x = THREE.MathUtils.lerp(-2.0, -20, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 12);
+                            manChar.root.rotation.x = s * 10;
+                            camPosGoal.set(0, 6.2, 14.5);
+                            camLookGoal.set(-4.0, 4.0, 2.0);
+                        } else if (t < 17.0) {
+                            const s = t - 12.5;
+                            epicChar.root.position.set(0.5, 0, 2.0);
+                            epicChar.root.rotation.y = Math.PI / 2;
+                            epicChar.rightArmPivot.rotation.x = -2.4;
+                            banhammerGroup.position.set(1.8, 3.8, 2.3);
+                            banhammerGroup.rotation.z = -0.2;
+                            once('ep9_lift', () => {
+                                sfx.playEpicChord();
+                                triggerImpactEffect('rgba(250,204,21,0.6)');
+                            });
+                            camPosGoal.set(0.5, 5.2, 9.5);
+                            camLookGoal.set(1.2, 3.8, 2.0);
+                        } else {
+                            const s = t - 17.0;
+                            epicChar.root.position.y = Math.abs(Math.sin(s * 9)) * 0.35;
+                            chillChar.root.position.y = Math.abs(Math.cos(s * 9)) * 0.35;
+                            camPosGoal.set(2.0, 5.2, 11.0);
+                            camLookGoal.set(2.5, 3.2, 2.0);
+                        }
+                    }
+                },
+                {
+                    id: 10,
+                    title: 'El Final Inesperado del Alcalde del Pueblo',
+                    category: 'Final',
+                    cast: 'Happy Face · Man Face · Chill Face · Epic Face',
+                    duration: 24.0,
+                    subtitles: [
+                        { start: 0.0,  end: 4.5,  html: 'EN ESTE PUEBLO SE CELEBRÓ LA GRAN CEREMONIA DEL <span class="text-amber-400">ALCALDE</span>...' },
+                        { start: 4.5,  end: 9.0,  html: '<span class="text-yellow-300">HAPPY FACE</span> DIO UN DISCURSO EMOCIONANTE...' },
+                        { start: 9.0,  end: 13.5, html: '<span class="text-sky-400">MAN FACE</span> QUISO ROBAR EL PROTAGONISMO... <span class="text-red-500">OOF.</span>' },
+                        { start: 13.5, end: 18.5, html: '<span class="text-yellow-300">EPIC FACE</span> Y <span class="text-teal-300">CHILL FACE</span> PUSIERON ORDEN...' },
+                        { start: 18.5, end: 24.0, html: 'Y TODOS CELEBRARON EN <span class="text-green-400">EN ESTE PUEBLO</span>.' }
+                    ],
+                    setup() {
+                        podiumGroup.visible = true;
+                        podiumGroup.position.set(0, 0, 1.5);
+
+                        happyChar.root.visible = true;
+                        happyChar.setFace('happy');
+                        happyChar.root.position.set(0, 0, 3.2);
+                        happyChar.root.rotation.set(0, 0, 0);
+
+                        chillChar.root.visible = true;
+                        chillChar.setFace('chill');
+                        chillChar.root.position.set(-3.8, 0, 2.2);
+                        chillChar.root.rotation.set(0, 0.3, 0);
+
+                        manChar.root.visible = true;
+                        manChar.setFace('man');
+                        manChar.root.position.set(3.8, 0, 2.2);
+                        manChar.root.rotation.set(0, -0.3, 0);
+
+                        epicChar.root.visible = true;
+                        epicChar.setFace('epic');
+                        epicChar.root.position.set(0, 0, -2.5);
+                    },
+                    update(t, dt, once) {
+                        if (t < 4.5) {
+                            camPosGoal.set(0, 5.2, 11.5);
+                            camLookGoal.set(0, 3.2, 1.8);
+                        } else if (t < 9.0) {
+                            const s = t - 4.5;
+                            happyChar.root.position.y = Math.abs(Math.sin(s * 6)) * 0.2;
+                            happyChar.rightArmPivot.rotation.x = -1.5 + Math.sin(s * 6) * 0.25;
+                            camPosGoal.set(0, 4.6, 8.0);
+                            camLookGoal.set(0, 3.5, 2.2);
+                        } else if (t < 13.5) {
+                            const s = t - 9.0;
+                            once('ep10_man_oof', () => {
+                                sfx.playOof();
+                                sfx.playBoom();
+                                manChar.setFace('shock');
+                                triggerImpactEffect('rgba(239,68,68,0.65)');
+                                spawnBurst(3.8, 3.0, 2.2, 16);
+                            });
+                            const fly = Math.min(1, s / 2.4);
+                            manChar.root.position.x = THREE.MathUtils.lerp(3.8, 18, fly);
+                            manChar.root.position.y = Math.max(0.5, Math.sin(fly * Math.PI) * 9);
+                            manChar.root.rotation.z = -s * 8;
+                            camPosGoal.set(2.5, 5.2, 12.5);
+                            camLookGoal.set(4.5, 3.5, 2.0);
+                        } else if (t < 18.5) {
+                            const s = t - 13.5;
+                            epicChar.root.position.set(2.5, Math.abs(Math.sin(s * 8)) * 0.35, 2.5);
+                            epicChar.root.rotation.y = -0.3;
+                            epicChar.leftArmPivot.rotation.z = -2.4;
+                            epicChar.rightArmPivot.rotation.z = 2.4;
+                            once('ep10_order', () => sfx.playEpicChord());
+                            camPosGoal.set(0, 5.2, 11.0);
+                            camLookGoal.set(0.5, 3.2, 2.0);
+                        } else {
+                            const s = t - 18.5;
+                            happyChar.root.position.y = Math.abs(Math.sin(s * 10)) * 0.4;
+                            happyChar.leftArmPivot.rotation.z = -2.4 + Math.sin(s * 12) * 0.3;
+                            happyChar.rightArmPivot.rotation.z = 2.4 - Math.sin(s * 12) * 0.3;
+
+                            epicChar.root.position.y = Math.abs(Math.cos(s * 10)) * 0.4;
+                            epicChar.leftArmPivot.rotation.z = -2.5;
+                            epicChar.rightArmPivot.rotation.z = 2.5;
+
+                            chillChar.root.position.y = Math.abs(Math.sin(s * 8)) * 0.25;
+                            if (epicChar.capePivot) epicChar.capePivot.rotation.x = 0.35 + Math.sin(s * 12) * 0.2;
+
+                            camPosGoal.set(0, 5.4, 12.5);
+                            camLookGoal.set(0, 3.2, 2.0);
+                        }
+                    }
+                }
+            ];
+
+            /**
+             * ====================================================================
+             * 7. INTERFAZ (BUSCADOR, FILTROS, MÚSICA DREAMCORE) Y BUCLE 60 FPS
+             * ====================================================================
+             */
+            let currentEpIndex = 0;
+            let selectedCategory = 'Todas';
+            let searchQuery = '';
+            let isPaused = false;
+            let autoplayEnabled = true;
+            let storyTime = 0;
+            let stepTimer = 0;
+            let activeSubKey = '';
+            const triggered = new Set();
+
+            const subtitleBox = document.getElementById('subtitle-box');
+            const subtitleText = document.getElementById('subtitle-text');
+            const progressBar = document.getElementById('story-progress-bar');
+            const currentEpHeader = document.getElementById('current-ep-header');
+            const episodesListEl = document.getElementById('episodes-list');
+            const episodesDrawer = document.getElementById('episodes-drawer');
+            const categoryFiltersEl = document.getElementById('category-filters');
+            const episodeSearchInput = document.getElementById('episode-search');
+
+            const btnDreamcore = document.getElementById('btn-dreamcore');
+            const dreamcoreLabel = document.getElementById('dreamcore-label');
+            const musicStatusPill = document.getElementById('music-status-pill');
+            const musicPanel = document.getElementById('music-panel');
+            const musicSourceLabel = document.getElementById('music-source-label');
+
+            function syncMusicUI() {
+                const active = dreamcoreMusic.enabled;
+                if (active) {
+                    btnDreamcore.classList.remove('text-purple-200', 'border-purple-400/35', 'bg-slate-950/85');
+                    btnDreamcore.classList.add('text-slate-950', 'border-purple-300', 'bg-purple-300');
+                    musicStatusPill.textContent = dreamcoreMusic.usingCustomTrack ? 'PISTA LOCAL ON' : 'DREAMCORE ON';
+                    musicStatusPill.className = 'px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-purple-400/30 text-purple-100 border border-purple-300/50';
+                } else {
+                    btnDreamcore.classList.remove('text-slate-950', 'border-purple-300', 'bg-purple-300');
+                    btnDreamcore.classList.add('text-purple-200', 'border-purple-400/35', 'bg-slate-950/85');
+                    musicStatusPill.textContent = dreamcoreMusic.usingCustomTrack ? 'PISTA LOCAL OFF' : 'DREAMCORE OFF';
+                    musicStatusPill.className = 'px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-purple-500/20 text-purple-200 border border-purple-400/30';
+                }
+                dreamcoreLabel.textContent = dreamcoreMusic.usingCustomTrack ? 'PISTA DREAMCORE' : 'MÚSICA DREAMCORE';
+                musicSourceLabel.textContent = dreamcoreMusic.usingCustomTrack
+                    ? 'Archivo de audio local cargado'
+                    : 'Sintetizador Onírico (Pads + Caja Musical)';
+            }
+
+            btnDreamcore.addEventListener('click', () => {
+                dreamcoreMusic.toggle();
+                syncMusicUI();
+            });
+
+            document.getElementById('btn-music-panel').addEventListener('click', () => {
+                musicPanel.classList.toggle('hidden');
+            });
+            document.getElementById('btn-close-music').addEventListener('click', () => {
+                musicPanel.classList.add('hidden');
+            });
+
+            const volSlider = document.getElementById('dreamcore-volume');
+            const volValLabel = document.getElementById('dreamcore-vol-val');
+            volSlider.addEventListener('input', () => {
+                const v = Number(volSlider.value);
+                volValLabel.textContent = `${v}%`;
+                dreamcoreMusic.setVolume(v / 100);
+            });
+
+            document.getElementById('audio-file-input').addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) {
+                    dreamcoreMusic.loadLocalFile(file);
+                    syncMusicUI();
+                }
+            });
+
+            document.getElementById('btn-reset-synth-music').addEventListener('click', () => {
+                dreamcoreMusic.useBuiltInSynth();
+                syncMusicUI();
+            });
+
+            function renderCategoryFilters() {
+                const cats = ['Todas', ...Array.from(new Set(EPISODES.map(e => e.category)))];
+                categoryFiltersEl.innerHTML = '';
+                cats.forEach(cat => {
+                    const active = selectedCategory === cat;
+                    const b = document.createElement('button');
+                    b.className = `px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border transition cursor-pointer ${
+                        active
+                            ? 'bg-amber-400 text-slate-950 border-amber-300'
+                            : 'bg-slate-900/80 text-slate-300 border-white/10 hover:bg-slate-800'
+                    }`;
+                    b.textContent = cat;
+                    b.addEventListener('click', () => {
+                        selectedCategory = cat;
+                        renderCategoryFilters();
+                        renderEpisodesMenu();
+                    });
+                    categoryFiltersEl.appendChild(b);
+                });
+            }
+
+            function renderEpisodesMenu() {
+                episodesListEl.innerHTML = '';
+                const q = searchQuery.trim().toLowerCase();
+                const filtered = EPISODES.filter(ep => {
+                    const matchCat = selectedCategory === 'Todas' || ep.category === selectedCategory;
+                    const matchText = !q ||
+                        ep.title.toLowerCase().includes(q) ||
+                        ep.cast.toLowerCase().includes(q) ||
+                        ep.category.toLowerCase().includes(q) ||
+                        String(ep.id) === q;
+                    return matchCat && matchText;
+                });
+
+                if (filtered.length === 0) {
+                    episodesListEl.innerHTML = '<div class="text-center text-xs text-slate-400 py-6">No hay historias con ese filtro.</div>';
+                    return;
+                }
+
+                filtered.forEach(ep => {
+                    const idx = EPISODES.findIndex(item => item.id === ep.id);
+                    const isActive = idx === currentEpIndex;
+                    const btn = document.createElement('button');
+                    btn.className = `w-full text-left p-2.5 rounded-xl border transition flex items-start justify-between gap-2 cursor-pointer ${
+                        isActive
+                            ? 'bg-amber-400/15 border-amber-400 text-white shadow-md'
+                            : 'bg-slate-900/75 hover:bg-slate-800/90 border-white/10 text-slate-300'
+                    }`;
+                    btn.innerHTML = `
+                        <div class="flex items-start gap-2.5 min-w-0">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                                isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                            }">${ep.id}</span>
+                            <div class="min-w-0">
+                                <p class="font-bold text-xs truncate ${isActive ? 'text-amber-300' : 'text-white'}">${ep.title}</p>
+                                <p class="text-[11px] text-slate-400 truncate mt-0.5">${ep.cast}</p>
+                            </div>
+                        </div>
+                        <span class="flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-white/10 text-slate-200">${ep.category}</span>
+                    `;
+                    btn.addEventListener('click', () => loadEpisode(idx));
+                    episodesListEl.appendChild(btn);
+                });
+            }
+
+            episodeSearchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                renderEpisodesMenu();
+            });
+
+            function hideAllEntities() {
+                [happyChar, manChar, epicChar, chillChar, giantChar].forEach(c => {
+                    c.root.visible = false;
+                    c.root.scale.set(1, 1, 1);
+                    c.root.rotation.set(0, 0, 0);
+                    resetPose(c);
+                });
+                bloxyColaGroup.visible = false;
+                linkedSwordGroup.visible = false;
+                pizzaBoxGroup.visible = false;
+                rockBoxMesh.visible = false;
+                rocketGroup.visible = false;
+                atmGroup.visible = false;
+                goldCardMesh.visible = false;
+                adminThroneGroup.visible = false;
+                mysteryBoxGroup.visible = false;
+                banhammerGroup.visible = false;
+                podiumGroup.visible = false;
+                laserBeam.visible = false;
+                shockwaveRing.visible = false;
+                finishLine.visible = false;
+                particles.forEach(p => { p.mesh.visible = false; });
+            }
+
+            function loadEpisode(index) {
+                currentEpIndex = (index + EPISODES.length) % EPISODES.length;
+                const ep = EPISODES[currentEpIndex];
+
+                storyTime = 0;
+                stepTimer = 0;
+                activeSubKey = '';
+                triggered.clear();
+                subtitleBox.style.opacity = '0';
+                progressBar.style.width = '0%';
+
+                hideAllEntities();
+                ep.setup();
+
+                currentEpHeader.textContent = `Ep. ${ep.id} — ${ep.title}`;
+                renderEpisodesMenu();
+            }
+
+            function updateSubtitles(ep, t) {
+                const idx = ep.subtitles.findIndex(s => t >= s.start && t < s.end);
+                if (idx === -1) {
+                    subtitleBox.style.opacity = '0';
+                    activeSubKey = '';
+                    return;
+                }
+                const key = `${ep.id}_${idx}`;
+                if (key !== activeSubKey) {
+                    activeSubKey = key;
+                    subtitleText.innerHTML = ep.subtitles[idx].html;
+                    subtitleBox.style.opacity = '1';
+                    subtitleBox.classList.remove('sub-pop');
+                    void subtitleBox.offsetWidth;
+                    subtitleBox.classList.add('sub-pop');
+                }
+            }
+
+            document.getElementById('btn-prev').addEventListener('click', () => loadEpisode(currentEpIndex - 1));
+            document.getElementById('btn-next').addEventListener('click', () => loadEpisode(currentEpIndex + 1));
+
+            document.getElementById('btn-pause').addEventListener('click', () => {
+                isPaused = !isPaused;
+                document.getElementById('icon-pause').classList.toggle('hidden', isPaused);
+                document.getElementById('icon-resume').classList.toggle('hidden', !isPaused);
+            });
+
+            document.getElementById('btn-restart').addEventListener('click', () => {
+                loadEpisode(currentEpIndex);
+                setManualCameraMode(false);
+                isPaused = false;
+                document.getElementById('icon-pause').classList.remove('hidden');
+                document.getElementById('icon-resume').classList.add('hidden');
+            });
+
+            const btnAutoplay = document.getElementById('btn-autoplay');
+            btnAutoplay.addEventListener('click', () => {
+                autoplayEnabled = !autoplayEnabled;
+                btnAutoplay.classList.toggle('text-amber-300', autoplayEnabled);
+                btnAutoplay.classList.toggle('border-amber-400/50', autoplayEnabled);
+                btnAutoplay.classList.toggle('text-slate-400', !autoplayEnabled);
+                btnAutoplay.classList.toggle('border-white/15', !autoplayEnabled);
+            });
+
+            document.getElementById('btn-sound').addEventListener('click', () => {
+                const active = sfx.toggle();
+                document.getElementById('icon-vol-on').classList.toggle('hidden', !active);
+                document.getElementById('icon-vol-off').classList.toggle('hidden', active);
+            });
+
+            document.getElementById('btn-drawer').addEventListener('click', () => {
+                episodesDrawer.classList.toggle('hidden');
+            });
+            document.getElementById('btn-close-drawer').addEventListener('click', () => {
+                episodesDrawer.classList.add('hidden');
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            renderCategoryFilters();
+            syncMusicUI();
+            loadEpisode(0);
+            const clock = new THREE.Clock();
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const dt = Math.min(clock.getDelta(), 0.05);
+                const elapsed = clock.getElapsedTime();
+
+                clouds.forEach((c, idx) => {
+                    c.position.x += (0.6 + (idx % 3) * 0.25) * dt;
+                    if (c.position.x > 75) c.position.x = -75;
+                });
+                waterMesh.position.y = 0.52 + Math.sin(elapsed * 3) * 0.04;
+
+                if (!isPaused) {
+                    const ep = EPISODES[currentEpIndex];
+                    storyTime += dt;
+                    stepTimer += dt;
+
+                    if (storyTime >= ep.duration) {
+                        if (autoplayEnabled) {
+                            loadEpisode(currentEpIndex + 1);
+                        } else {
+                            loadEpisode(currentEpIndex);
+                        }
+                    } else {
+                        const onceFn = (id, fn) => {
+                            if (!triggered.has(id)) {
+                                triggered.add(id);
+                                fn();
+                            }
+                        };
+                        const stepFn = (interval, pitch) => {
+                            if (stepTimer > interval) {
+                                sfx.playStep(pitch);
+                                stepTimer = 0;
+                            }
+                        };
+
+                        ep.update(storyTime, dt, onceFn, stepFn);
+                        updateSubtitles(ep, storyTime);
+                        updateParticles(dt);
+                        progressBar.style.width = `${Math.min(100, (storyTime / ep.duration) * 100)}%`;
+                    }
+                }
+
+                if (manualCamera) {
+                    const targetPos = new THREE.Vector3(
+                        orbitTarget.x + orbitSpherical.radius * Math.sin(orbitSpherical.phi) * Math.sin(orbitSpherical.theta),
+                        orbitTarget.y + orbitSpherical.radius * Math.cos(orbitSpherical.phi),
+                        orbitTarget.z + orbitSpherical.radius * Math.sin(orbitSpherical.phi) * Math.cos(orbitSpherical.theta)
+                    );
+                    camera.position.lerp(targetPos, 0.14);
+                    camera.lookAt(orbitTarget);
+                } else {
+                    camera.position.lerp(camPosGoal, 0.08);
+                    currentLookAt.lerp(camLookGoal, 0.1);
+                    camera.lookAt(currentLookAt);
+                }
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => waitForThreeAndStart(0));
+        } else {
+            waitForThreeAndStart(0);
+        }
+    })();
+    </script>
+</body>
+</html>
